@@ -20,6 +20,8 @@ import HealthcareDashboard from './components/healthcare/healthcaredashboard';
 import TerminalPatientLogin from './components/terminal/terminalpatientlogin';
 import TerminalPatientRegistration from './components/terminal/terminalpatientregistration';
 
+import { supabase } from './supabase';
+
 // Simple Router Implementation (without react-router-dom)
 const App = () => {
   const [currentRoute, setCurrentRoute] = React.useState(
@@ -38,6 +40,21 @@ const App = () => {
   const navigate = (path) => {
     window.history.pushState({}, '', path);
     setCurrentRoute(path);
+  };
+
+  // Test Supabase connection
+  const testSupabaseConnection = async () => {
+    console.log('Testing Supabase connection...');
+    try {
+      const { data, error } = await supabase.from('outPatient').select('count');
+      if (error) {
+        console.log('Supabase connection error:', error);
+      } else {
+        console.log('Supabase connected successfully!', data);
+      }
+    } catch (err) {
+      console.log('Connection test failed:', err);
+    }
   };
 
   // Landing Page Component
@@ -305,6 +322,26 @@ const App = () => {
               </button>
             </div>
           </div>
+
+          {/* Temporary Supabase Test Button */}
+          <button
+            onClick={testSupabaseConnection}
+            style={{
+              background: 'linear-gradient(145deg, #ea4335 0%, #d33b2c 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '12px',
+              marginBottom: '15px',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            🔗 Test Supabase Connection
+          </button>
+
 
           {/* Footer */}
           <div style={{

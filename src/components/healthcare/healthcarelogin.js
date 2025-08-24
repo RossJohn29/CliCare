@@ -36,24 +36,6 @@ const HealthcareLogin = () => {
       // Mock API delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Mock doctor validation - only doctors allowed
-      const validDoctors = {
-        'DR001': 'doctor123',
-        'DR002': 'doctor456'
-      };
-      
-      if (!validDoctors[credentials.staffId.toUpperCase()]) {
-        setError('Invalid Doctor ID. Try: DR001 or DR002');
-        setLoading(false);
-        return;
-      }
-
-      if (validDoctors[credentials.staffId.toUpperCase()] !== credentials.password) {
-        setError('Incorrect password. Try: doctor123 or doctor456');
-        setLoading(false);
-        return;
-      }
-
       // Mock successful login - only set doctor type
       sessionStorage.setItem('healthcareToken', 'mock_healthcare_token_' + credentials.staffId);
       sessionStorage.setItem('staffId', credentials.staffId.toUpperCase());

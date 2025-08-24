@@ -1,74 +1,129 @@
-// admindashboard.js - CLICARE Admin Dashboard Component
+// admindashboard.js - Updated with Backend Integration + Using existing CSS structure
 import React, { useState, useEffect } from 'react';
 import './admindashboard.css';
+import { adminApi, adminUtils } from '../../services/adminApi';
 
 const AdminDashboard = () => {
   const [currentPage, setCurrentPage] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [adminInfo, setAdminInfo] = useState({
-    adminId: '',
-    name: '',
-    role: ''
+    name: 'Loading...',
+    role: 'Loading...',
+    adminId: 'Loading...'
   });
   const [dashboardData, setDashboardData] = useState({
-    todayStats: {
+    stats: {
       totalPatients: 0,
-      newRegistrations: 0,
+      outPatients: 0,
+      inPatients: 0,
       appointments: 0,
-      labRequests: 0
+      activeStaff: 0,
+      systemAlerts: 0
     },
-    recentActivity: [],
+    recentActivities: [],
     systemStatus: {
       server: 'online',
       database: 'online',
       backup: 'completed'
     }
   });
-  const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [error, setError] = useState('');
 
+  // Authentication check and data loading
   useEffect(() => {
-    // Load admin info from session
-    const adminId = sessionStorage.getItem('adminId') || 'ADMIN001';
-    setAdminInfo({
-      adminId: adminId,
-      name: adminId === 'ADMIN999' ? 'Super Administrator' : 'Hospital Administrator',
-      role: adminId === 'ADMIN999' ? 'System Admin' : 'Department Admin'
-    });
-
-    // Mock dashboard data loading
-    const loadDashboardData = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setDashboardData({
-        todayStats: {
-          totalPatients: 247,
-          newRegistrations: 18,
-          appointments: 156,
-          labRequests: 89
-        },
-        recentActivity: [
-          { time: '14:32', action: 'New patient registration', user: 'PAT789', status: 'success' },
-          { time: '14:28', action: 'Lab result uploaded', user: 'DR001', status: 'success' },
-          { time: '14:25', action: 'System backup completed', user: 'SYSTEM', status: 'info' },
-          { time: '14:20', action: 'Department queue updated', user: 'AUTO', status: 'success' },
-          { time: '14:15', action: 'Emergency contact called', user: 'NURSE03', status: 'warning' }
-        ],
-        systemStatus: {
-          server: 'online',
-          database: 'online',
-          backup: 'completed'
+    const initializeDashboard = async () => {
+      try {
+        // Check authentication
+        if (!adminUtils.isAuthenticated()) {
+          window.location.href = '/admin-login';
+          return;
         }
-      });
-      setLoading(false);
+
+        // Validate token
+        await adminApi.validateToken();
+
+        // Load admin info from storage first (for immediate display)
+        const storedAdminInfo = adminUtils.getAdminInfo();
+        if (storedAdminInfo) {
+          setAdminInfo({
+            name: adminUtils.formatAdminName(storedAdminInfo),
+            role: adminUtils.formatAdminPosition(storedAdminInfo),
+            adminId: storedAdminInfo.healthadmin_id || storedAdminInfo.healthadminid
+          });
+        }
+
+        // Load fresh admin profile and dashboard data
+        const [profileResponse, dashboardResponse] = await Promise.all([
+          adminApi.getProfile(),
+          adminApi.getDashboardStats()
+        ]);
+
+        // Update admin info with fresh data
+        if (profileResponse.success && profileResponse.admin) {
+          setAdminInfo({
+            name: adminUtils.formatAdminName(profileResponse.admin),
+            role: adminUtils.formatAdminPosition(profileResponse.admin),
+            adminId: profileResponse.admin.healthadmin_id || profileResponse.admin.healthadminid
+          });
+        }
+
+        // Update dashboard data
+        if (dashboardResponse.success) {
+          setDashboardData({
+            stats: dashboardResponse.stats || dashboardData.stats,
+            recentActivities: dashboardResponse.recentActivities || [],
+            systemStatus: dashboardResponse.systemStatus || dashboardData.systemStatus
+          });
+        }
+
+        setLoading(false);
+
+      } catch (error) {
+        console.error('Dashboard initialization error:', error);
+        setError(adminUtils.formatErrorMessage(error));
+        setLoading(false);
+        
+        // If authentication error, redirect to login
+        if (error.message?.includes('Unauthorized') || error.message?.includes('Invalid token')) {
+          setTimeout(() => {
+            window.location.href = '/admin-login';
+          }, 2000);
+        }
+      }
     };
 
-    loadDashboardData();
+    initializeDashboard();
   }, []);
 
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      sessionStorage.removeItem('adminToken');
-      sessionStorage.removeItem('adminId');
+  // Auto-refresh dashboard data every 30 seconds
+  useEffect(() => {
+    const refreshInterval = setInterval(async () => {
+      try {
+        const response = await adminApi.getDashboardStats();
+        if (response.success) {
+          setDashboardData(prev => ({
+            stats: response.stats || prev.stats,
+            recentActivities: response.recentActivities || prev.recentActivities,
+            systemStatus: response.systemStatus || prev.systemStatus
+          }));
+        }
+      } catch (error) {
+        console.warn('Auto-refresh failed:', error);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+      await adminApi.logout();
+    } catch (error) {
+      console.warn('Logout error:', error);
+    } finally {
       window.location.href = '/admin-login';
     }
   };
@@ -92,24 +147,45 @@ const AdminDashboard = () => {
           <div className="admin-loading-spinner"></div>
           <p>Loading dashboard data...</p>
         </div>
+      ) : error ? (
+        <div className="admin-placeholder">
+          <div className="admin-placeholder-icon">❌</div>
+          <h3>Error Loading Dashboard</h3>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="admin-back-btn"
+          >
+            Retry
+          </button>
+        </div>
       ) : (
         <>
           <div className="admin-stats-grid">
             <div className="admin-stat-card">
               <div className="admin-stat-icon">👥</div>
               <div className="admin-stat-content">
-                <h3>Total Patients Today</h3>
-                <div className="admin-stat-number">{dashboardData.todayStats.totalPatients}</div>
-                <small>+12% from yesterday</small>
+                <h3>Total Patients</h3>
+                <div className="admin-stat-number">{dashboardData.stats.totalPatients}</div>
+                <small>Active in system</small>
               </div>
             </div>
 
             <div className="admin-stat-card">
-              <div className="admin-stat-icon">✨</div>
+              <div className="admin-stat-icon">🏥</div>
               <div className="admin-stat-content">
-                <h3>New Registrations</h3>
-                <div className="admin-stat-number">{dashboardData.todayStats.newRegistrations}</div>
-                <small>+5% from yesterday</small>
+                <h3>Out-Patients</h3>
+                <div className="admin-stat-number">{dashboardData.stats.outPatients}</div>
+                <small>Registered today</small>
+              </div>
+            </div>
+
+            <div className="admin-stat-card">
+              <div className="admin-stat-icon">🛏️</div>
+              <div className="admin-stat-content">
+                <h3>In-Patients</h3>
+                <div className="admin-stat-number">{dashboardData.stats.inPatients}</div>
+                <small>Currently admitted</small>
               </div>
             </div>
 
@@ -117,17 +193,26 @@ const AdminDashboard = () => {
               <div className="admin-stat-icon">📅</div>
               <div className="admin-stat-content">
                 <h3>Appointments</h3>
-                <div className="admin-stat-number">{dashboardData.todayStats.appointments}</div>
-                <small>3 pending confirmations</small>
+                <div className="admin-stat-number">{dashboardData.stats.appointments}</div>
+                <small>Scheduled</small>
               </div>
             </div>
 
             <div className="admin-stat-card">
-              <div className="admin-stat-icon">🧪</div>
+              <div className="admin-stat-icon">👨‍⚕️</div>
               <div className="admin-stat-content">
-                <h3>Lab Requests</h3>
-                <div className="admin-stat-number">{dashboardData.todayStats.labRequests}</div>
-                <small>15 results pending</small>
+                <h3>Active Staff</h3>
+                <div className="admin-stat-number">{dashboardData.stats.activeStaff}</div>
+                <small>Online now</small>
+              </div>
+            </div>
+
+            <div className="admin-stat-card">
+              <div className="admin-stat-icon">🚨</div>
+              <div className="admin-stat-content">
+                <h3>System Alerts</h3>
+                <div className="admin-stat-number">{dashboardData.stats.systemAlerts}</div>
+                <small>Requires attention</small>
               </div>
             </div>
           </div>
@@ -136,12 +221,12 @@ const AdminDashboard = () => {
             <div className="admin-activity-section">
               <h3>Recent Activity</h3>
               <div className="admin-activity-list">
-                {dashboardData.recentActivity.map((activity, index) => (
-                  <div key={index} className="admin-activity-item">
+                {dashboardData.recentActivities.map((activity) => (
+                  <div key={activity.id} className="admin-activity-item">
                     <div className="admin-activity-time">{activity.time}</div>
                     <div className="admin-activity-content">
                       <div className="admin-activity-action">{activity.action}</div>
-                      <div className="admin-activity-user">by {activity.user}</div>
+                      <div className="admin-activity-user">{activity.user}</div>
                     </div>
                     <div className={`admin-activity-status ${activity.status}`}>
                       {activity.status === 'success' ? '✅' : 
@@ -170,17 +255,16 @@ const AdminDashboard = () => {
                 <div className="admin-status-item">
                   <span className="admin-status-label">Last Backup</span>
                   <span className={`admin-status-badge ${dashboardData.systemStatus.backup}`}>
-                    {dashboardData.systemStatus.backup === 'completed' ? '🟢 2 hours ago' : '🟡 Pending'}
+                    {dashboardData.systemStatus.backup === 'completed' ? '🟢 Completed' : '🟡 In Progress'}
                   </span>
                 </div>
               </div>
 
               <div className="admin-quick-actions">
                 <h4>Quick Actions</h4>
-                <button className="admin-action-btn">📊 Generate Daily Report</button>
-                <button className="admin-action-btn">🔄 Run System Backup</button>
-                <button className="admin-action-btn">📢 Send Announcement</button>
-                <button className="admin-action-btn">⚙️ System Maintenance</button>
+                <button className="admin-action-btn" onClick={() => window.location.reload()}>🔄 Refresh Data</button>
+                <button className="admin-action-btn">📊 Generate Report</button>
+                <button className="admin-action-btn">⚙️ System Settings</button>
               </div>
             </div>
           </div>
@@ -189,21 +273,18 @@ const AdminDashboard = () => {
     </div>
   );
 
-  const renderPlaceholderPage = (title, description) => (
+  const renderComingSoon = (icon, title, description) => (
     <div className="admin-page-content">
       <div className="admin-page-header">
         <h2>{title}</h2>
         <p>{description}</p>
       </div>
       <div className="admin-placeholder">
-        <div className="admin-placeholder-icon">🚧</div>
-        <h3>Coming Soon</h3>
-        <p>This feature is currently under development and will be available in the next release.</p>
-        <button 
-          onClick={() => setCurrentPage('overview')}
-          className="admin-back-btn"
-        >
-          ← Back to Dashboard
+        <div className="admin-placeholder-icon">{icon}</div>
+        <h3>{title} Coming Soon</h3>
+        <p>This feature will be available in the next update.</p>
+        <button className="admin-back-btn" onClick={() => setCurrentPage('overview')}>
+          Back to Overview
         </button>
       </div>
     </div>
@@ -211,19 +292,15 @@ const AdminDashboard = () => {
 
   const renderCurrentPage = () => {
     switch (currentPage) {
-      case 'overview':
+      case 'overview': 
         return renderOverview();
-      case 'patients':
-        return renderPlaceholderPage('Patient Management', 'Comprehensive patient record management system');
-      case 'staff':
-        return renderPlaceholderPage('Staff Management', 'Healthcare provider account administration');
-      case 'analytics':
-        return renderPlaceholderPage('Health Analytics', 'AI-powered health trend analysis and reporting');
-      case 'system':
-        return renderPlaceholderPage('System Settings', 'System configuration and maintenance tools');
-      case 'reports':
-        return renderPlaceholderPage('Reports', 'Generate comprehensive system and health reports');
-      default:
+      case 'analytics': 
+        return renderComingSoon('📈', 'Health Analytics', 'AI-generated health reports and insights');
+      case 'system': 
+        return renderComingSoon('⚙️', 'System Settings', 'Configure system parameters and maintenance');
+      case 'reports': 
+        return renderComingSoon('📋', 'Reports', 'Generate and manage system reports');
+      default: 
         return renderOverview();
     }
   };
@@ -234,15 +311,18 @@ const AdminDashboard = () => {
       <div className="admin-mobile-header">
         <button 
           className="admin-sidebar-toggle"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+          onClick={() => setSidebarOpen(true)}
         >
           ☰
         </button>
         <div className="admin-mobile-logo">
           <span className="admin-mobile-icon">🏥</span>
-          <span className="admin-mobile-title">CLICARE Admin</span>
+          <span className="admin-mobile-title">CLICARE</span>
         </div>
-        <button className="admin-mobile-logout" onClick={handleLogout}>
+        <button 
+          onClick={handleLogout} 
+          className="admin-mobile-logout"
+        >
           🚪
         </button>
       </div>
