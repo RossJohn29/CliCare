@@ -1,33 +1,53 @@
-// terminalpatientregistration.js - CLICARE Terminal Patient Registration Component
+// terminalpatientregistration.js - UPDATED to display non-editable patient data for returning patients
 import React, { useState, useEffect } from 'react';
 import './terminalpatientregistration.css';
 
 const TerminalPatientRegistration = () => {
-  const [currentStep, setCurrentStep] = useState(1); // 1: Personal, 2: Emergency, 3: Review, 4: Symptoms, 5: Details, 6: Summary
+  const [currentStep, setCurrentStep] = useState(1);
   const [patientType, setPatientType] = useState('new'); // 'new' or 'returning'
+  const [patientData, setPatientData] = useState({
+    // Patient Info from database
+    patient_id: '',
+    name: '',
+    birthday: '',
+    age: '',
+    sex: '',
+    address: '',
+    contact_no: '',
+    email: '',
+    registration_date: '',
+    emergency_contact_name: '',
+    emergency_contact_relationship: '',
+    emergency_contact_no: '',
+
+    
+    // Form data for symptoms (editable)
+    selectedSymptoms: [],
+    preferredTime: '',
+    duration: '',
+    severity: '',
+    previousTreatment: '',
+    allergies: '',
+    medications: '',
+    preferredDate: '',
+    appointmentTime: ''
+  });
+  
   const [formData, setFormData] = useState({
-    // Personal Details
+    // New patient form data (only used for new registrations)
     fullName: '',
     age: '',
     sex: '',
     address: '',
     contactNumber: '',
     email: '',
-    
-    // Emergency Contact
     emergencyContactName: '',
     emergencyContactNumber: '',
     emergencyRelationship: '',
-    
-    // Optional ID Scan
     idType: '',
     idNumber: '',
-    
-    // Symptoms (for step 4)
     selectedSymptoms: [],
     preferredTime: '',
-
-    // Health details (for step 5)
     duration: '',
     severity: '',
     previousTreatment: '',
@@ -44,20 +64,58 @@ const TerminalPatientRegistration = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    // Check if patient type was set from login
+    // Check authentication and patient type
     const storedPatientType = sessionStorage.getItem('patientType') || 'new';
-    const storedPatientName = sessionStorage.getItem('patientName') || '';
-    const storedPatientId = sessionStorage.getItem('terminalPatientId') || '';
+    const storedPatientInfo = sessionStorage.getItem('patientInfo');
+    const patientToken = sessionStorage.getItem('patientToken');
     
     setPatientType(storedPatientType);
     
-    if (storedPatientType === 'returning' && storedPatientName) {
-      setFormData(prev => ({
-        ...prev,
-        fullName: storedPatientName
-      }));
-      // Skip to symptoms for returning patients
-      setCurrentStep(4);
+    if (storedPatientType === 'returning' && storedPatientInfo) {
+      try {
+        const patientInfo = JSON.parse(storedPatientInfo);
+        console.log('Retrieved patient info:', patientInfo);
+        
+        // Map database fields to display data
+        setPatientData({
+          patient_id: patientInfo.patient_id || '',
+          name: patientInfo.name || '',
+          birthday: patientInfo.birthday || '',
+          age: patientInfo.age || '',
+          sex: patientInfo.sex || '',
+          address: patientInfo.address || '',
+          contact_no: patientInfo.contact_no || '',
+          email: patientInfo.email || '',
+          registration_date: patientInfo.registration_date || '',
+          emergency_contact_name: patientInfo.emergency_contact_name || '',
+          emergency_contact_relationship: patientInfo.emergency_contact_relationship || '',
+          emergency_contact_no: patientInfo.emergency_contact_no || '',
+          // Initialize symptom data as empty - user will fill these
+          selectedSymptoms: [],
+          preferredTime: '',
+          duration: '',
+          severity: '',
+          previousTreatment: '',
+          allergies: '',
+          medications: '',
+          preferredDate: '',
+          appointmentTime: ''
+        });
+        
+        // Skip to symptoms step for returning patients
+        setCurrentStep(4);
+        
+      } catch (err) {
+        console.error('Error parsing patient info:', err);
+        setError('Error loading patient information. Please try logging in again.');
+      }
+    } else if (storedPatientType === 'new') {
+      // For new patients, start from step 1
+      setCurrentStep(1);
+    } else {
+      // No valid session, redirect to login
+      console.warn('No valid patient session found');
+      window.location.href = '/terminal-patient-login';
     }
 
     // Update time every second
@@ -68,250 +126,270 @@ const TerminalPatientRegistration = () => {
   }, []);
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-    setError('');
-  };
-
-  const handleIDScan = () => {
-    setIdScanMode(true);
-    setError('');
+    const { name, value } = e.target;
     
-    // Simulate OCR scanning with realistic delay
-    setTimeout(() => {
-      setFormData({
-        ...formData,
-        fullName: 'MARIA CLARA SANTOS',
-        address: 'BLOCK 15 LOT 8, BARANGAY SAN JOSE, MANILA, METRO MANILA',
-        idType: 'National ID',
-        idNumber: '1234-5678-9012-3456'
-      });
-      setIdScanMode(false);
-      alert('✅ ID scanned successfully! Information auto-filled.');
-    }, 3000);
-  };
-
-  const validateStep = (step) => {
-    switch (step) {
-      case 1:
-        return formData.fullName && formData.age && formData.sex && 
-               formData.address && formData.contactNumber && formData.email;
-      case 2:
-        return formData.emergencyContactName && formData.emergencyContactNumber && 
-               formData.emergencyRelationship;
-      case 3:
-        return termsAccepted;
-      case 4:
-        return formData.selectedSymptoms.length > 0;
-      case 5:
-        return formData.duration && formData.severity;
-      case 6:
-        return formData.preferredDate && formData.appointmentTime;
-      default:
-        return true;
-    }
-  };
-
-  const nextStep = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(currentStep + 1);
-      setError('');
+    if (patientType === 'returning') {
+      // For returning patients, only update symptom-related fields
+      setPatientData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     } else {
-      if (currentStep === 3) {
-        setError('Please accept the terms and conditions to proceed');
-      } else if (currentStep === 4) {
-        setError('Please select at least one symptom or health concern');
-      } else if (currentStep === 5) {
-        setError('Please fill in duration and severity level');
-      } else if (currentStep === 6) {
-        setError('Please select your preferred appointment date and time');
-      } else {
-        setError('Please fill in all required fields');
-      }
+      // For new patients, update form data
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     }
-  };
-
-  const prevStep = () => {
-    setCurrentStep(currentStep - 1);
     setError('');
   };
 
   const handleSymptomToggle = (symptom) => {
-    const isSelected = formData.selectedSymptoms.includes(symptom);
-    const updatedSymptoms = isSelected
-      ? formData.selectedSymptoms.filter(s => s !== symptom)
-      : [...formData.selectedSymptoms, symptom];
-    
-    setFormData({
-      ...formData,
-      selectedSymptoms: updatedSymptoms
-    });
-    setError('');
-  };
-
-  const generateDepartmentRecommendation = () => {
-    const departmentMapping = {
-      'Fever': 'Internal Medicine',
-      'Chest Pain': 'Cardiology',
-      'Chest Discomfort': 'Cardiology',
-      'Heart Palpitations': 'Cardiology',
-      'High Blood Pressure': 'Cardiology',
-      'Cough': 'Pulmonology',
-      'Shortness of Breath': 'Pulmonology',
-      'Joint Pain': 'Orthopedics',
-      'Back Pain': 'Orthopedics',
-      'Muscle Pain': 'Orthopedics',
-      'Arthritis': 'Rheumatology',
-      'Migraine': 'Neurology',
-      'Seizures': 'Neurology',
-      'Memory Problems': 'Neurology',
-      'Rash': 'Dermatology',
-      'Skin Discoloration': 'Dermatology',
-      'Acne': 'Dermatology',
-      'Vision Problems': 'Ophthalmology',
-      'Eye Pain': 'Ophthalmology',
-      'Hearing Loss': 'ENT',
-      'Ear Pain': 'ENT',
-      'Anxiety': 'Psychiatry',
-      'Depression': 'Psychiatry',
-      'Menstrual Problems': 'Gynecology',
-      'Pregnancy Concerns': 'Obstetrics',
-      'Annual Check-up': 'General Practice',
-      'Vaccination': 'General Practice',
-      'Health Screening': 'General Practice'
-    };
-
-    const primarySymptom = formData.selectedSymptoms[0];
-    return departmentMapping[primarySymptom] || 'General Practice';
-  };
-
-  const outpatientSymptoms = [
-    // General Symptoms
-    { category: 'General', symptoms: ['Fever', 'Headache', 'Fatigue', 'Weight Loss', 'Weight Gain', 'Loss of Appetite'] },
-    
-    // Respiratory
-    { category: 'Respiratory', symptoms: ['Cough', 'Shortness of Breath', 'Chest Pain', 'Sore Throat', 'Runny Nose', 'Congestion'] },
-    
-    // Cardiovascular
-    { category: 'Cardiovascular', symptoms: ['Chest Discomfort', 'Heart Palpitations', 'Dizziness', 'Swelling in Legs', 'High Blood Pressure'] },
-    
-    // Gastrointestinal
-    { category: 'Gastrointestinal', symptoms: ['Nausea', 'Vomiting', 'Diarrhea', 'Constipation', 'Abdominal Pain', 'Heartburn'] },
-    
-    // Musculoskeletal
-    { category: 'Musculoskeletal', symptoms: ['Joint Pain', 'Back Pain', 'Muscle Pain', 'Neck Pain', 'Arthritis', 'Injury'] },
-    
-    // Neurological
-    { category: 'Neurological', symptoms: ['Migraine', 'Memory Problems', 'Numbness', 'Tingling', 'Seizures', 'Balance Issues'] },
-    
-    // Skin/Dermatological
-    { category: 'Skin', symptoms: ['Rash', 'Itching', 'Skin Discoloration', 'Wounds', 'Acne', 'Hair Loss'] },
-    
-    // Mental Health
-    { category: 'Mental Health', symptoms: ['Anxiety', 'Depression', 'Stress', 'Sleep Problems', 'Mood Changes'] },
-    
-    // Women\'s Health
-    { category: 'Women\'s Health', symptoms: ['Menstrual Problems', 'Pregnancy Concerns', 'Menopause Symptoms', 'Breast Issues'] },
-    
-    // Eye/ENT
-    { category: 'Eye/ENT', symptoms: ['Vision Problems', 'Hearing Loss', 'Ear Pain', 'Eye Pain', 'Discharge'] },
-    
-    // Routine Care
-    { category: 'Routine Care', symptoms: ['Annual Check-up', 'Vaccination', 'Lab Test Follow-up', 'Prescription Refill', 'Health Screening'] }
-  ];
-
-  const generatePatientId = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    return `PAT${timestamp}`;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateStep(currentStep)) {
-      setError('Please complete all required fields');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      const patientId = patientType === 'new' ? generatePatientId() : 
-                       sessionStorage.getItem('terminalPatientId') || generatePatientId();
-
-      // Use the department recommendation function
-      const assignedDepartment = generateDepartmentRecommendation();
-      const queueNumber = Math.floor(Math.random() * 50) + 1;
-
-      // Store registration data
-      sessionStorage.setItem('registrationComplete', 'true');
-      sessionStorage.setItem('patientId', patientId);
-      sessionStorage.setItem('assignedDepartment', assignedDepartment);
-      sessionStorage.setItem('queueNumber', queueNumber.toString());
-      sessionStorage.setItem('patientData', JSON.stringify(formData));
-
-      alert(`🎉 Registration successful!\n\nPatient ID: ${patientId}\nDepartment: ${assignedDepartment}\nQueue Number: ${queueNumber}\n\nPlease collect your printed navigation guide.`);
+    if (patientType === 'returning') {
+      const isSelected = patientData.selectedSymptoms.includes(symptom);
+      const updatedSymptoms = isSelected
+        ? patientData.selectedSymptoms.filter(s => s !== symptom)
+        : [...patientData.selectedSymptoms, symptom];
       
-      // In a real implementation, this would redirect to a completion/printing page
-      window.location.href = '/terminal-patient-login';
-    } catch (err) {
-      setError('Registration failed. Please try again or contact hospital staff.');
-    } finally {
-      setLoading(false);
+      setPatientData(prev => ({
+        ...prev,
+        selectedSymptoms: updatedSymptoms
+      }));
+    } else {
+      const isSelected = formData.selectedSymptoms.includes(symptom);
+      const updatedSymptoms = isSelected
+        ? formData.selectedSymptoms.filter(s => s !== symptom)
+        : [...formData.selectedSymptoms, symptom];
+      
+      setFormData(prev => ({
+        ...prev,
+        selectedSymptoms: updatedSymptoms
+      }));
+    }
+    setError('');
+  };
+
+  // Validation function - UPDATED to check emergency contact for returning patients
+  const validateStep = (step) => {
+    if (patientType === 'returning') {
+      // For returning patients
+      switch (step) {
+        case 4: // Personal Info Review (check emergency contact data exists)
+          return patientData.patient_id && 
+                 patientData.name && 
+                 patientData.emergency_contact_name && 
+                 patientData.emergency_contact_relationship && 
+                 patientData.emergency_contact_no;
+        case 5: // Symptoms
+          return patientData.selectedSymptoms && patientData.selectedSymptoms.length > 0;
+        case 6: // Health Info
+          return patientData.duration && patientData.severity;
+        case 7: // Final Review
+          return patientData.selectedSymptoms.length > 0 && 
+                 patientData.duration && 
+                 patientData.severity &&
+                 patientData.emergency_contact_name && 
+                 patientData.emergency_contact_relationship && 
+                 patientData.emergency_contact_no;
+        default:
+          return true;
+      }
+    } else {
+      // For new patients (existing validation)
+      switch (step) {
+        case 1: // Personal Details
+          return formData.fullName && formData.age && formData.sex && formData.address && formData.contactNumber && formData.email;
+        case 2: // Emergency Contact
+          return formData.emergencyContactName && formData.emergencyContactNumber && formData.emergencyRelationship;
+        case 3: // ID Verification
+          return formData.idType && formData.idNumber;
+        case 4: // Symptoms
+          return formData.selectedSymptoms && formData.selectedSymptoms.length > 0;
+        case 5: // Health Info
+          return formData.duration && formData.severity;
+        case 6: // Review
+          return formData.fullName && formData.selectedSymptoms.length > 0 && termsAccepted;
+        default:
+          return true;
+      }
     }
   };
 
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+  const nextStep = () => {
+    const maxStep = patientType === 'returning' ? 7 : 6;
+    if (currentStep < maxStep && validateStep(currentStep)) {
+      setCurrentStep(currentStep + 1);
+      setError('');
+    } else {
+      setError('Please complete all required fields before continuing.');
+    }
   };
 
-  const renderProgressBar = () => {
-    const totalSteps = patientType === 'new' ? 6 : 3;
-    const steps = patientType === 'new' 
-      ? [
-          { id: 1, label: 'Personal', icon: '👤' },
-          { id: 2, label: 'Emergency', icon: '🚨' },
-          { id: 3, label: 'Review', icon: '📋' },
-          { id: 4, label: 'Symptoms', icon: '🩺' },
-          { id: 5, label: 'Details', icon: '📝' },
-          { id: 6, label: 'Summary', icon: '✅' }
-        ]
-      : [
-          { id: 4, label: 'Symptoms', icon: '🩺' },
-          { id: 5, label: 'Details', icon: '📝' },
-          { id: 6, label: 'Summary', icon: '✅' }
-        ];
+  const prevStep = () => {
+    const minStep = patientType === 'returning' ? 4 : 1;
+    if (currentStep > minStep) {
+      setCurrentStep(currentStep - 1);
+      setError('');
+    }
+  };
 
-    return (
-      <div className="terminal-progress-container">
-        
-        <div className="terminal-progress-bar">
-          {steps.map((step, index) => (
-            <React.Fragment key={step.id}>
-              <div className={`terminal-step ${currentStep >= step.id ? 'active' : ''}`}>
-                <span className="terminal-step-number">
-                  {currentStep > step.id ? '✓' : step.icon}
-                </span>
-                <span className="terminal-step-label">{step.label}</span>
+  // MODIFICATION 1: Update the renderProgressBar function in terminalpatientregistration.js
+// Replace your existing renderProgressBar function with this enhanced version
+
+const renderProgressBar = () => {
+  const totalSteps = patientType === 'returning' ? 4 : 6; // Returning: Info, Symptoms, Details, Summary
+  const stepNames = patientType === 'returning' 
+    ? ['Personal', 'Symptoms', 'Details', 'Summary']
+    : ['Personal', 'Emergency', 'Review', 'Symptoms', 'Details', 'Summary'];
+  
+  const adjustedStep = patientType === 'returning' 
+    ? Math.max(1, currentStep - 3) // Map steps 4,5,6,7 to 1,2,3,4
+    : currentStep;
+
+  const stepIcons = patientType === 'returning' 
+    ? ['1', '2', '3', '4'] 
+    : ['1', '2', '3', '4', '5', '6'];
+
+  return (
+    <div className="terminal-progress-container">
+      <div className="terminal-progress-steps">
+        {stepNames.map((name, index) => {
+          const stepNumber = index + 1;
+          const isActive = stepNumber === adjustedStep;
+          const isCompleted = stepNumber < adjustedStep;
+          
+          return (
+            <React.Fragment key={index}>
+              <div className="terminal-progress-step-wrapper">
+                <div className={`terminal-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
+                  <div className="terminal-step-number">
+                    {isCompleted ? '✓' : stepIcons[index]}
+                  </div>
+                  <div className="terminal-step-label">{name}</div>
+                </div>
               </div>
-              {index < steps.length - 1 && (
-                <div className={`terminal-step-line ${currentStep > step.id ? 'active' : ''}`}></div>
+              
+              {/* Add connecting line between steps (except after last step) */}
+              {index < stepNames.length - 1 && (
+                <div className={`terminal-step-connector ${isCompleted ? 'completed' : ''} ${stepNumber === adjustedStep - 1 ? 'active' : ''}`}></div>
               )}
             </React.Fragment>
-          ))}
+          );
+        })}
+      </div>
+      
+    </div>
+  );
+};
+
+  // RETURNING PATIENT READ-ONLY INFORMATION DISPLAY STEP
+  const renderPatientInfoStep = () => (
+    <div className="terminal-reg-card terminal-step-transition">
+      <div className="terminal-step-header">
+        <div className="terminal-step-icon">👤</div>
+        <h3>Patient Information</h3>
+        <p>Your Registered Information</p>
+      </div>
+
+      <div className="terminal-patient-info-banner">
+        <div className="terminal-info-icon">✅</div>
+        <div className="terminal-info-content">
+          <h4>Welcome back, {patientData.name}!</h4>
+          <p>Your information is displayed below for verification. This data cannot be edited at the terminal.</p>
         </div>
       </div>
-    );
-  };
 
+      <div className="terminal-readonly-sections">
+        <div className="terminal-readonly-section">
+          <h4>🏥 Basic Information</h4>
+          <div className="terminal-readonly-grid">
+            <div className="terminal-readonly-item">
+              <label>Patient ID:</label>
+              <div className="terminal-readonly-value">{patientData.patient_id}</div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Full Name:</label>
+              <div className="terminal-readonly-value">{patientData.name}</div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Age:</label>
+              <div className="terminal-readonly-value">{patientData.age} years old</div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Sex:</label>
+              <div className="terminal-readonly-value">{patientData.sex}</div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Date of Birth:</label>
+              <div className="terminal-readonly-value">
+                {patientData.birthday ? new Date(patientData.birthday).toLocaleDateString() : 'Not available'}
+              </div>
+            </div>
+            <div className="terminal-readonly-item full-width">
+              <label>Address:</label>
+              <div className="terminal-readonly-value">{patientData.address}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="terminal-readonly-section">
+          <h4>📞 Contact Information</h4>
+          <div className="terminal-readonly-grid">
+            <div className="terminal-readonly-item">
+              <label>Contact Number:</label>
+              <div className="terminal-readonly-value">{patientData.contact_no}</div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Email Address:</label>
+              <div className="terminal-readonly-value">{patientData.email}</div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Registration Date:</label>
+              <div className="terminal-readonly-value">
+                {patientData.registration_date ? new Date(patientData.registration_date).toLocaleDateString() : 'Not available'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="terminal-readonly-section">
+          <h4>🚨 Emergency Contact</h4>
+          <div className="terminal-readonly-grid">
+            <div className="terminal-readonly-item">
+              <label>Contact Name:</label>
+              <div className="terminal-readonly-value">
+                {patientData.emergency_contact_name || 'Not provided'}
+              </div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Relationship:</label>
+              <div className="terminal-readonly-value">
+                {patientData.emergency_contact_relationship || 'Not provided'}
+              </div>
+            </div>
+            <div className="terminal-readonly-item">
+              <label>Contact Number:</label>
+              <div className="terminal-readonly-value">
+                {patientData.emergency_contact_no || 'Not provided'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+      {(!patientData.emergency_contact_name || !patientData.emergency_contact_relationship || !patientData.emergency_contact_no) && (
+        <div className="terminal-warning-note">
+          <div className="terminal-warning-icon">⚠️</div>
+          <div className="terminal-warning-content">
+            <strong>Emergency Contact Required</strong>
+            <p>Your emergency contact information is incomplete. Please visit the reception desk to update this information before continuing.</p>
+          </div>
+        </div>
+      )}
+      </div>
+  );
+
+  // NEW PATIENT FORM STEPS (existing implementation)
   const renderPersonalDetailsStep = () => (
     <div className="terminal-reg-card terminal-step-transition">
       <div className="terminal-step-header">
@@ -321,109 +399,106 @@ const TerminalPatientRegistration = () => {
       </div>
 
       <div className="terminal-id-scan">
-        <button 
-          type="button" 
-          onClick={handleIDScan}
-          className="terminal-id-scan-btn"
+        <button
+          onClick={() => setIdScanMode(!idScanMode)}
           disabled={idScanMode}
+          className="terminal-id-scan-btn"
         >
           {idScanMode ? (
             <>
               <span className="terminal-loading-spinner"></span>
-              Scanning Philippine ID...
+              Scanning ID...
             </>
           ) : (
-            <>🆔 Scan Philippine ID for Quick Setup</>
+            <>
+              📄 Scan Philippine ID for Quick Setup
+            </>
           )}
         </button>
-        <small>Optional: Auto-fill using your government ID</small>
+        <small>Scan your ID for faster data entry</small>
       </div>
 
-      <div className="terminal-form-grid">
+      <div className="terminal-form-grid two-column">
         <div className="terminal-reg-input-group">
-          <label>Full Legal Name *</label>
+          <label>Full Name *</label>
           <input
             type="text"
             name="fullName"
             value={formData.fullName}
             onChange={handleInputChange}
-            placeholder="Enter your complete legal name"
+            placeholder="Enter your complete name"
             className="terminal-reg-input"
             required
           />
         </div>
 
-        <div className="terminal-form-grid two-column">
-          <div className="terminal-reg-input-group">
-            <label>Age *</label>
-            <input
-              type="number"
-              name="age"
-              value={formData.age}
-              onChange={handleInputChange}
-              placeholder="Age"
-              className="terminal-reg-input"
-              min="1"
-              max="120"
-              required
-            />
-          </div>
-
-          <div className="terminal-reg-input-group">
-            <label>Sex *</label>
-            <select
-              name="sex"
-              value={formData.sex}
-              onChange={handleInputChange}
-              className="terminal-reg-input"
-              required
-            >
-              <option value="">Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-            </select>
-          </div>
-        </div>
-
         <div className="terminal-reg-input-group">
-          <label>Complete Address *</label>
-          <textarea
-            name="address"
-            value={formData.address}
+          <label>Age *</label>
+          <input
+            type="number"
+            name="age"
+            value={formData.age}
             onChange={handleInputChange}
-            placeholder="House/Unit Number, Street, Barangay, City, Province"
-            className="terminal-reg-input terminal-reg-textarea"
-            rows="3"
+            placeholder="Age"
+            className="terminal-reg-input"
+            min="1"
+            max="120"
             required
           />
         </div>
 
-        <div className="terminal-form-grid two-column">
-          <div className="terminal-reg-input-group">
-            <label>Contact Number *</label>
-            <input
-              type="tel"
-              name="contactNumber"
-              value={formData.contactNumber}
-              onChange={handleInputChange}
-              placeholder="09XX-XXX-XXXX"
-              className="terminal-reg-input"
-              pattern="[0-9]{11}"
-              required
-            />
-          </div>
+        <div className="terminal-reg-input-group">
+          <label>Sex *</label>
+          <select
+            name="sex"
+            value={formData.sex}
+            onChange={handleInputChange}
+            className="terminal-reg-input"
+            required
+          >
+            <option value="">Select sex</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
 
-          <div className="terminal-reg-input-group">
-            <label>Email Address</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              placeholder="your.email@example.com"
-              className="terminal-reg-input"
-            />
-          </div>
+        <div className="terminal-reg-input-group">
+          <label>Contact Number *</label>
+          <input
+            type="tel"
+            name="contactNumber"
+            value={formData.contactNumber}
+            onChange={handleInputChange}
+            placeholder="09XX-XXX-XXXX"
+            className="terminal-reg-input"
+            required
+          />
+        </div>
+
+        <div className="terminal-reg-input-group full-width">
+          <label>Complete Address *</label>
+          <input
+            type="text"
+            name="address"
+            value={formData.address}
+            onChange={handleInputChange}
+            placeholder="House No., Street, Barangay, City, Province"
+            className="terminal-reg-input"
+            required
+          />
+        </div>
+
+        <div className="terminal-reg-input-group full-width">
+          <label>Email Address *</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="your.email@example.com"
+            className="terminal-reg-input"
+            required
+          />
         </div>
       </div>
     </div>
@@ -434,14 +509,14 @@ const TerminalPatientRegistration = () => {
       <div className="terminal-step-header">
         <div className="terminal-step-icon">🚨</div>
         <h3>Emergency Contact</h3>
-        <p>Who should we contact in case of emergency?</p>
+        <p>Provide emergency contact information</p>
       </div>
 
       <div className="terminal-emergency-banner">
-        <span style={{ fontSize: '2em' }}>🚨</span>
-        <div>
+        <div className="terminal-banner-icon">🚨</div>
+        <div className="terminal-banner-content">
           <h4>Important Information</h4>
-          <p>This person will be contacted during medical emergencies or if you need assistance</p>
+          <p>This person will be contacted in case of medical emergency</p>
         </div>
       </div>
 
@@ -468,7 +543,6 @@ const TerminalPatientRegistration = () => {
             onChange={handleInputChange}
             placeholder="09XX-XXX-XXXX"
             className="terminal-reg-input"
-            pattern="[0-9]{11}"
             required
           />
         </div>
@@ -520,12 +594,10 @@ const TerminalPatientRegistration = () => {
               <label>Contact Number:</label>
               <span>{formData.contactNumber}</span>
             </div>
-            {formData.email && (
-              <div className="terminal-review-item">
-                <label>Email:</label>
-                <span>{formData.email}</span>
-              </div>
-            )}
+            <div className="terminal-review-item">
+              <label>Email:</label>
+              <span>{formData.email}</span>
+            </div>
             <div className="terminal-review-item full-width">
               <label>Address:</label>
               <span>{formData.address}</span>
@@ -550,91 +622,80 @@ const TerminalPatientRegistration = () => {
             </div>
           </div>
         </div>
-
-        {formData.idType && (
-          <div className="terminal-review-section">
-            <h4>🆔 ID Information</h4>
-            <div className="terminal-review-grid">
-              <div className="terminal-review-item">
-                <label>ID Type:</label>
-                <span>{formData.idType}</span>
-              </div>
-              <div className="terminal-review-item">
-                <label>ID Number:</label>
-                <span>{formData.idNumber}</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="terminal-terms">
         <label className="terminal-checkbox-label">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             checked={termsAccepted}
             onChange={(e) => setTermsAccepted(e.target.checked)}
-            required 
           />
-          <span className="terminal-checkmark"></span>
-          <span>I agree to CLICARE's privacy policy and terms of service, and consent to the processing of my medical information for healthcare purposes.</span>
+          <span>
+            I confirm that all information provided is accurate and I agree to the 
+            <strong> Terms and Conditions</strong> and <strong>Privacy Policy</strong> 
+            of CLICARE Hospital.
+          </span>
         </label>
       </div>
     </div>
   );
 
-  const renderSymptomsStep = () => (
-    <div className="terminal-reg-card terminal-step-transition">
-      <div className="terminal-step-header">
-        <div className="terminal-step-icon">🩺</div>
-        <h3>Health Assessment</h3>
-        <p>Please select your current symptoms or health concerns</p>
-      </div>
+  // SHARED STEPS (both new and returning patients)
+  const renderSymptomsStep = () => {
+    const currentData = patientType === 'returning' ? patientData : formData;
+    
+    return (
+      <div className="terminal-reg-card terminal-step-transition">
+        <div className="terminal-step-header">
+          <div className="terminal-step-icon">🩺</div>
+          <h3>Health Assessment</h3>
+          <p>What brings you to the clinic today?</p>
+        </div>
 
-      <div className="terminal-symptoms-info">
-        <div className="terminal-info-banner">
-          <span style={{ fontSize: '2em' }}>ℹ️</span>
-          <div>
-            <h4>Symptom Selection</h4>
-            <p>Select all symptoms that apply to you. This helps us direct you to the most appropriate department and medical specialist.</p>
+        <div className="terminal-symptoms-info">
+          <div className="terminal-info-banner">
+            <div className="terminal-info-icon">💡</div>
+            <div className="terminal-info-content">
+              <h4>Select Your Symptoms</h4>
+              <p>Choose all symptoms or health concerns you're experiencing. This helps us direct you to the right specialist.</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="terminal-symptoms-container">
-        {formData.selectedSymptoms.length > 0 && (
+        {currentData.selectedSymptoms.length > 0 && (
           <div className="terminal-selected-symptoms">
-            <h4>Selected Symptoms ({formData.selectedSymptoms.length})</h4>
+            <h4>Selected Symptoms ({currentData.selectedSymptoms.length})</h4>
             <div className="terminal-selected-list">
-              {formData.selectedSymptoms.map((symptom, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleSymptomToggle(symptom)}
+              {currentData.selectedSymptoms.map(symptom => (
+                <div 
+                  key={symptom}
                   className="terminal-selected-symptom"
+                  onClick={() => handleSymptomToggle(symptom)}
                 >
-                  <span>{symptom}</span>
+                  {symptom}
                   <span className="remove-icon">×</span>
-                </button>
+                </div>
               ))}
             </div>
           </div>
         )}
 
         <div className="terminal-symptoms-categories">
-          {outpatientSymptoms.map((category, categoryIndex) => (
-            <div key={categoryIndex} className="terminal-symptom-category">
-              <h4 className="terminal-category-title">{category.category}</h4>
+          {outpatientSymptoms.map(category => (
+            <div key={category.category} className="terminal-symptom-category">
+              <div className="terminal-category-title">{category.category}</div>
               <div className="terminal-symptom-grid">
-                {category.symptoms.map((symptom, symptomIndex) => (
+                {category.symptoms.map(symptom => (
                   <button
-                    key={symptomIndex}
+                    key={symptom}
                     onClick={() => handleSymptomToggle(symptom)}
                     className={`terminal-symptom-btn ${
-                      formData.selectedSymptoms.includes(symptom) ? 'selected' : ''
+                      currentData.selectedSymptoms.includes(symptom) ? 'selected' : ''
                     }`}
                   >
                     <span className="symptom-text">{symptom}</span>
-                    {formData.selectedSymptoms.includes(symptom) && (
+                    {currentData.selectedSymptoms.includes(symptom) && (
                       <span className="check-icon">✓</span>
                     )}
                   </button>
@@ -644,167 +705,196 @@ const TerminalPatientRegistration = () => {
           ))}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderDetailsStep = () => (
-    <div className="terminal-reg-card terminal-step-transition">
-      <div className="terminal-step-header">
-        <div className="terminal-step-icon">📝</div>
-        <h3>Health Details</h3>
-        <p>Provide more information about your condition</p>
-      </div>
-
-      <div className="terminal-form-grid two-column">
-        <div className="terminal-reg-input-group">
-          <label>Duration *</label>
-          <select
-            name="duration"
-            value={formData.duration}
-            onChange={handleInputChange}
-            className="terminal-reg-input"
-            required
-          >
-            <option value="">How long have you had these symptoms?</option>
-            <option value="less-than-day">Less than a day</option>
-            <option value="1-3-days">1-3 days</option>
-            <option value="4-7-days">4-7 days</option>
-            <option value="1-2-weeks">1-2 weeks</option>
-            <option value="2-4-weeks">2-4 weeks</option>
-            <option value="1-3-months">1-3 months</option>
-            <option value="more-than-3-months">More than 3 months</option>
-          </select>
+  const renderDetailsStep = () => {
+    const currentData = patientType === 'returning' ? patientData : formData;
+    
+    return (
+      <div className="terminal-reg-card terminal-step-transition">
+        <div className="terminal-step-header">
+          <div className="terminal-step-icon">📝</div>
+          <h3>Additional Details</h3>
+          <p>Help us understand your condition better</p>
         </div>
 
-        <div className="terminal-reg-input-group">
-          <label>Severity Level *</label>
-          <select
-            name="severity"
-            value={formData.severity}
-            onChange={handleInputChange}
-            className="terminal-reg-input"
-            required
-          >
-            <option value="">Rate your symptom severity</option>
-            <option value="mild">Mild - Doesn't interfere with daily activities</option>
-            <option value="moderate">Moderate - Some interference with activities</option>
-            <option value="severe">Severe - Significant interference</option>
-            <option value="very-severe">Very Severe - Unable to function normally</option>
-          </select>
-        </div>
+        <div className="terminal-form-grid two-column">
+          <div className="terminal-reg-input-group">
+            <label>How long have you experienced these symptoms? *</label>
+            <select
+              name="duration"
+              value={currentData.duration}
+              onChange={handleInputChange}
+              className="terminal-reg-input"
+              required
+            >
+              <option value="">Select duration</option>
+              <option value="Less than 1 day">Less than 1 day</option>
+              <option value="1-3 days">1-3 days</option>
+              <option value="1 week">1 week</option>
+              <option value="2-4 weeks">2-4 weeks</option>
+              <option value="1-3 months">1-3 months</option>
+              <option value="More than 3 months">More than 3 months</option>
+            </select>
+          </div>
 
-        <div className="terminal-reg-input-group">
-          <label>Preferred Date *</label>
-          <input
-            type="date"
-            name="preferredDate"
-            value={formData.preferredDate}
-            onChange={handleInputChange}
-            min={new Date().toISOString().split('T')[0]}
-            className="terminal-reg-input"
-            required
-          />
-        </div>
+          <div className="terminal-reg-input-group">
+            <label>Severity Level *</label> 
+            <select
+              name="severity"
+              value={currentData.severity}
+              onChange={handleInputChange}
+              className="terminal-reg-input"
+              required
+            >
+              <option value="">Select severity</option>
+              <option value="Mild">Mild - Manageable discomfort</option>
+              <option value="Moderate">Moderate - Affects daily activities</option>
+              <option value="Severe">Severe - Significantly impacts life</option>
+              <option value="Critical">Critical - Urgent attention needed</option>
+            </select>
+          </div>
 
-        <div className="terminal-reg-input-group">
-          <label>Preferred Time *</label>
-          <select
-            name="appointmentTime"
-            value={formData.appointmentTime}
-            onChange={handleInputChange}
-            className="terminal-reg-input"
-            required
-          >
-            <option value="">Select preferred time</option>
-            <option value="morning">Morning (8:00 AM - 12:00 PM)</option>
-            <option value="afternoon">Afternoon (12:00 PM - 5:00 PM)</option>
-            <option value="evening">Evening (5:00 PM - 8:00 PM)</option>
-            <option value="anytime">Any available time</option>
-          </select>
-        </div>
-      </div>
+          <div className="terminal-reg-input-group full-width">
+            <label>Previous Treatment</label>
+            <textarea
+              name="previousTreatment"
+              value={currentData.previousTreatment}
+              onChange={handleInputChange}
+              placeholder="Any previous treatments or medications tried for this condition"
+              className="terminal-reg-input terminal-reg-textarea"
+              rows="2"
+            />
+          </div>
 
-      <div className="terminal-form-grid">
-        <div className="terminal-reg-input-group full-width">
-          <label>Previous Treatment</label>
-          <textarea
-            name="previousTreatment"
-            value={formData.previousTreatment}
-            onChange={handleInputChange}
-            placeholder="Any medications, treatments, or remedies you've tried"
-            className="terminal-reg-input terminal-reg-textarea"
-            rows="2"
-          />
-        </div>
+          <div className="terminal-reg-input-group full-width">
+            <label>Known Allergies</label>
+            <input
+              type="text"
+              name="allergies"
+              value={currentData.allergies}
+              onChange={handleInputChange}
+              placeholder="List any known allergies (medications, food, etc.)"
+              className="terminal-reg-input"
+            />
+          </div>
 
-        <div className="terminal-reg-input-group full-width">
-          <label>Known Allergies</label>
-          <input
-            type="text"
-            name="allergies"
-            value={formData.allergies}
-            onChange={handleInputChange}
-            placeholder="List any known allergies (medications, food, etc.)"
-            className="terminal-reg-input"
-          />
-        </div>
-
-        <div className="terminal-reg-input-group full-width">
-          <label>Current Medications</label>
-          <textarea
-            name="medications"
-            value={formData.medications}
-            onChange={handleInputChange}
-            placeholder="List any medications you're currently taking"
-            className="terminal-reg-input terminal-reg-textarea"
-            rows="2"
-          />
+          <div className="terminal-reg-input-group full-width">
+            <label>Current Medications</label>
+            <textarea
+              name="medications"
+              value={currentData.medications}
+              onChange={handleInputChange}
+              placeholder="List any medications you're currently taking"
+              className="terminal-reg-input terminal-reg-textarea"
+              rows="2"
+            />
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderSummaryStep = () => (
-    <div className="terminal-reg-card terminal-step-transition">
-      <div className="terminal-step-header">
-        <div className="terminal-step-icon">✅</div>
-        <h3>Registration Summary</h3>
-        <p>Review all information before completing registration</p>
-      </div>
+  const renderSummaryStep = () => {
+    const currentData = patientType === 'returning' ? patientData : formData;
+    
+    return (
+      <div className="terminal-reg-card terminal-step-transition">
+        <div className="terminal-step-header">
+          <div className="terminal-step-icon">✅</div>
+          <h3>Registration Summary</h3>
+          <p>Review all information before completing registration</p>
+        </div>
 
-      <div className="terminal-summary-sections">
-        {patientType === 'new' && (
-          <>
-            <div className="terminal-summary-section">
-              <h4>👤 Personal Information</h4>
-              <div className="terminal-summary-grid">
-                <div className="terminal-summary-item">
-                  <label>Full Name:</label>
-                  <span>{formData.fullName}</span>
-                </div>
-                <div className="terminal-summary-item">
-                  <label>Age:</label>
-                  <span>{formData.age}</span>
-                </div>
-                <div className="terminal-summary-item">
-                  <label>Sex:</label>
-                  <span>{formData.sex}</span>
-                </div>
-                <div className="terminal-summary-item full-width">
-                  <label>Address:</label>
-                  <span>{formData.address}</span>
-                </div>
-                <div className="terminal-summary-item">
-                  <label>Contact:</label>
-                  <span>{formData.contactNumber}</span>
-                </div>
-                <div className="terminal-summary-item">
-                  <label>Email:</label>
-                  <span>{formData.email}</span>
-                </div>
-              </div>
+        <div className="terminal-summary-sections">
+          {/* Show patient info for both types, but from different data sources */}
+          <div className="terminal-summary-section">
+            <h4>👤 Patient Information</h4>
+            <div className="terminal-summary-grid">
+              {patientType === 'returning' ? (
+                <>
+                  <div className="terminal-summary-item">
+                    <label>Patient ID:</label>
+                    <span>{patientData.patient_id}</span>
+                  </div>
+                  <div className="terminal-summary-item">
+                    <label>Full Name:</label>
+                    <span>{patientData.name}</span>
+                  </div>
+                  <div className="terminal-summary-item">
+                    <label>Age:</label>
+                    <span>{patientData.age}</span>
+                  </div>
+                  <div className="terminal-summary-item">
+                    <label>Sex:</label>
+                    <span>{patientData.sex}</span>
+                  </div>
+                  <div className="terminal-summary-item full-width">
+                    <label>Contact:</label>
+                    <span>{patientData.contact_no}</span>
+                    
+                  </div>
+                  <div className="terminal-summary-item full-width">
+                    <label>Email:</label>
+                    <span>{patientData.email}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="terminal-summary-item">
+                    <label>Full Name:</label>
+                    <span>{formData.fullName}</span>
+                  </div>
+                  <div className="terminal-summary-item">
+                    <label>Age:</label>
+                    <span>{formData.age}</span>
+                  </div>
+                  <div className="terminal-summary-item">
+                    <label>Sex:</label>
+                    <span>{formData.sex}</span>
+                  </div>
+                  <div className="terminal-summary-item full-width">
+                    <label>Contact:</label>
+                    <span>{formData.contactNumber} | {formData.email}</span>
+                  </div>
+                </>
+              )}
             </div>
+          </div>
 
+          <div className="terminal-summary-section">
+            <h4>🩺 Health Information</h4>
+            <div className="terminal-summary-grid">
+              <div className="terminal-summary-item full-width">
+                <label>Symptoms ({currentData.selectedSymptoms.length}):</label>
+                <span>{currentData.selectedSymptoms.join(', ')}</span>
+              </div>
+              <div className="terminal-summary-item">
+                <label>Duration:</label>
+                <span>{currentData.duration}</span>
+              </div>
+              <div className="terminal-summary-item">
+                <label>Severity:</label>
+                <span>{currentData.severity}</span>
+              </div>
+              {currentData.allergies && (
+                <div className="terminal-summary-item full-width">
+                  <label>Allergies:</label>
+                  <span>{currentData.allergies}</span>
+                </div>
+              )}
+              {currentData.medications && (
+                <div className="terminal-summary-item full-width">
+                  <label>Current Medications:</label>
+                  <span>{currentData.medications}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Show emergency contact only for new patients */}
+          {patientType === 'new' && (
             <div className="terminal-summary-section">
               <h4>🚨 Emergency Contact</h4>
               <div className="terminal-summary-grid">
@@ -822,112 +912,178 @@ const TerminalPatientRegistration = () => {
                 </div>
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        <div className="terminal-summary-section">
-          <h4>📋 Selected Symptoms</h4>
-          <div className="terminal-summary-symptoms">
-            {formData.selectedSymptoms.map((symptom, index) => (
-              <span key={index} className="terminal-summary-symptom">{symptom}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="terminal-summary-section">
-          <h4>🩺 Health Details</h4>
-          <div className="terminal-summary-grid">
-            <div className="terminal-summary-item">
-              <label>Duration:</label>
-              <span>{formData.duration.replace('-', ' ')}</span>
+          <div className="terminal-recommended-department">
+            <div className="terminal-recommendation-icon">🏥</div>
+            <div className="terminal-recommendation-content">
+              <h4>Recommended Department</h4>
+              <p><strong>{generateDepartmentRecommendation()}</strong></p>
+              <small>Based on your selected symptoms</small>
             </div>
-            <div className="terminal-summary-item">
-              <label>Severity:</label>
-              <span>{formData.severity}</span>
-            </div>
-            {formData.previousTreatment && (
-              <div className="terminal-summary-item full-width">
-                <label>Previous Treatment:</label>
-                <span>{formData.previousTreatment}</span>
-              </div>
-            )}
-            {formData.allergies && (
-              <div className="terminal-summary-item full-width">
-                <label>Allergies:</label>
-                <span>{formData.allergies}</span>
-              </div>
-            )}
-            {formData.medications && (
-              <div className="terminal-summary-item full-width">
-                <label>Current Medications:</label>
-                <span>{formData.medications}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="terminal-summary-section">
-          <h4>📅 Appointment Preferences</h4>
-          <div className="terminal-summary-grid">
-            <div className="terminal-summary-item">
-              <label>Preferred Date:</label>
-              <span>{formData.preferredDate}</span>
-            </div>
-            <div className="terminal-summary-item">
-              <label>Preferred Time:</label>
-              <span>{formData.appointmentTime}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="terminal-recommendation-section">
-          <h4>🏥 Recommended Department</h4>
-          <div className="terminal-recommendation-card">
-            <div className="terminal-recommendation-department">
-              {generateDepartmentRecommendation()}
-            </div>
-            <p>Based on your symptoms, we recommend starting with this department. The doctor may refer you to other specialists if needed.</p>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const generateDepartmentRecommendation = () => {
+    const currentData = patientType === 'returning' ? patientData : formData;
+    const departmentMapping = {
+      'Fever': 'Internal Medicine',
+      'Chest Pain': 'Cardiology',
+      'Chest Discomfort': 'Cardiology',
+      'Heart Palpitations': 'Cardiology',
+      'High Blood Pressure': 'Cardiology',
+      'Cough': 'Pulmonology',
+      'Shortness of Breath': 'Pulmonology',
+      'Joint Pain': 'Orthopedics',
+      'Back Pain': 'Orthopedics',
+      'Muscle Pain': 'Orthopedics',
+      'Arthritis': 'Rheumatology',
+      'Migraine': 'Neurology',
+      'Seizures': 'Neurology',
+      'Memory Problems': 'Neurology',
+      'Rash': 'Dermatology',
+      'Skin Discoloration': 'Dermatology',
+      'Acne': 'Dermatology',
+      'Vision Problems': 'Ophthalmology',
+      'Eye Pain': 'Ophthalmology',
+      'Hearing Loss': 'ENT',
+      'Ear Pain': 'ENT',
+      'Anxiety': 'Psychiatry',
+      'Depression': 'Psychiatry',
+      'Menstrual Problems': 'Gynecology',
+      'Pregnancy Concerns': 'Obstetrics',
+      'Annual Check-up': 'General Practice',
+      'Vaccination': 'General Practice',
+      'Health Screening': 'General Practice'
+    };
+
+    const primarySymptom = currentData.selectedSymptoms[0];
+    return departmentMapping[primarySymptom] || 'General Practice';
+  };
+
+  const outpatientSymptoms = [
+    // General Symptoms
+    { category: 'General', symptoms: ['Fever', 'Headache', 'Fatigue', 'Weight Loss', 'Weight Gain', 'Loss of Appetite'] },
+    
+    // Respiratory
+    { category: 'Respiratory', symptoms: ['Cough', 'Shortness of Breath', 'Chest Pain', 'Sore Throat', 'Runny Nose', 'Congestion'] },
+    
+    // Cardiovascular
+    { category: 'Cardiovascular', symptoms: ['Chest Discomfort', 'Heart Palpitations', 'Dizziness', 'Swelling in Legs', 'High Blood Pressure'] },
+    
+    // Gastrointestinal
+    { category: 'Gastrointestinal', symptoms: ['Nausea', 'Vomiting', 'Diarrhea', 'Constipation', 'Abdominal Pain', 'Heartburn'] },
+    
+    // Musculoskeletal
+    { category: 'Musculoskeletal', symptoms: ['Joint Pain', 'Back Pain', 'Muscle Pain', 'Neck Pain', 'Arthritis', 'Injury'] },
+    
+    // Neurological
+    { category: 'Neurological', symptoms: ['Migraine', 'Memory Problems', 'Numbness', 'Tingling', 'Seizures', 'Balance Issues'] },
+    
+    // Skin/Dermatological
+    { category: 'Skin', symptoms: ['Rash', 'Itching', 'Skin Discoloration', 'Wounds', 'Acne', 'Hair Loss'] },
+    
+    // Mental Health
+    { category: 'Mental Health', symptoms: ['Anxiety', 'Depression', 'Stress', 'Sleep Problems', 'Mood Changes'] },
+    
+    // Women\'s Health
+    { category: 'Women\'s Health', symptoms: ['Menstrual Problems', 'Pregnancy Concerns', 'Menopause Symptoms', 'Breast Issues'] },
+    
+    // Eye/ENT
+    { category: 'Eye/ENT', symptoms: ['Vision Problems', 'Hearing Loss', 'Ear Pain', 'Eye Pain', 'Discharge'] },
+    
+    // Routine Care
+    { category: 'Routine Care', symptoms: ['Annual Check-up', 'Vaccination', 'Lab Test Follow-up', 'Prescription Refill', 'Health Screening'] }
+  ];
+
+  const handleSubmit = async () => {
+    if (!validateStep(currentStep)) {
+      setError('Please complete all required fields');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const submitData = patientType === 'returning' ? patientData : formData;
+      
+      // Mock API call for now - replace with actual backend call
+      console.log('Submitting registration data:', {
+        patientType,
+        data: submitData,
+        recommendedDepartment: generateDepartmentRecommendation()
+      });
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Success
+      alert('✅ Registration completed successfully!');
+      
+      // Clear session storage
+      sessionStorage.removeItem('patientType');
+      sessionStorage.removeItem('patientInfo');
+      sessionStorage.removeItem('patientToken');
+      sessionStorage.removeItem('patientId');
+      sessionStorage.removeItem('patientName');
+      
+      // Redirect to login or success page
+      window.location.href = '/terminal-patient-login';
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderBackButton = () => {
-    // Don't show back button on first step for new patients or on symptoms step for returning patients
-    if ((patientType === 'new' && currentStep === 1) || (patientType === 'returning' && currentStep === 4)) {
+    if (patientType === 'returning' && currentStep === 4) {
+      // For returning patients, show logout option instead of back
       return (
         <button 
-          onClick={() => window.location.href = '/terminal-patient-login'}
+          type="button"
+          onClick={() => {
+            sessionStorage.clear();
+            window.location.href = '/terminal-patient-login';
+          }}
           className="terminal-nav-btn secondary"
         >
-          ← Back to Login
+          🚪 Logout
         </button>
       );
     }
 
+    if ((patientType === 'new' && currentStep === 1) || (patientType === 'returning' && currentStep === 4)) {
+      return null; // No back button on first step
+    }
+
     return (
       <button 
-        type="button" 
+        type="button"
         onClick={prevStep}
         className="terminal-nav-btn secondary"
-        disabled={loading}
       >
-        ← Previous
+        ← Back
       </button>
     );
   };
 
   const renderNextButton = () => {
-    const isLastStep = (patientType === 'new' && currentStep === 6) || (patientType === 'returning' && currentStep === 6);
+    const maxStep = patientType === 'returning' ? 7 : 6; // Returning: steps 4,5,6,7
     
-    if (isLastStep) {
+    if (currentStep === maxStep) {
       return (
-        <button 
+        <button
           type="button"
           onClick={handleSubmit}
           disabled={loading || !validateStep(currentStep)}
-          className="terminal-nav-btn primary submit"
+          className="terminal-nav-btn submit"
         >
           {loading ? (
             <>
@@ -957,16 +1113,19 @@ const TerminalPatientRegistration = () => {
     if (patientType === 'returning') {
       switch (currentStep) {
         case 4:
-          return renderSymptomsStep();
+          return renderPatientInfoStep(); // Show read-only patient info first
         case 5:
-          return renderDetailsStep();
+          return renderSymptomsStep();
         case 6:
+          return renderDetailsStep();
+        case 7:
           return renderSummaryStep();
         default:
-          return renderSymptomsStep();
+          return renderPatientInfoStep();
       }
     }
 
+    // New patient flow
     switch (currentStep) {
       case 1:
         return renderPersonalDetailsStep();
@@ -994,6 +1153,8 @@ const TerminalPatientRegistration = () => {
           <p>Patient Registration System</p>
         </div>
         <div className="terminal-reg-info">
+          <p><strong>{formatTime(currentTime)}</strong></p>
+          <p>{formatDate(currentTime)}</p>
         </div>
       </div>
 
@@ -1020,6 +1181,25 @@ const TerminalPatientRegistration = () => {
       </div>
     </div>
   );
+
+  // Utility functions
+  function formatTime(date) {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  }
+
+  function formatDate(date) {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
 };
 
 export default TerminalPatientRegistration;

@@ -22,8 +22,8 @@ const HealthcareLogin = () => {
   };
 
   const handleLogin = async () => {
-    setLoading(true);
-    setError('');
+  setLoading(true);
+  setError('');
 
     try {
       // Validate inputs
@@ -33,19 +33,38 @@ const HealthcareLogin = () => {
         return;
       }
 
-      // Mock API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock successful login - only set doctor type
-      sessionStorage.setItem('healthcareToken', 'mock_healthcare_token_' + credentials.staffId);
-      sessionStorage.setItem('staffId', credentials.staffId.toUpperCase());
+      // Make API request to backend
+      const response = await fetch('http://localhost:5000/api/healthcare/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          staffId: credentials.staffId.toUpperCase(),
+          password: credentials.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Login failed. Please check your credentials.');
+        setLoading(false);
+        return;
+      }
+
+      // Store authentication data
+      sessionStorage.setItem('healthcareToken', data.token);
+      sessionStorage.setItem('staffId', data.staff.staff_id);
       sessionStorage.setItem('staffType', 'doctor');
-      
-      alert('🎉 Login successful! Redirecting to healthcare dashboard...');
+      sessionStorage.setItem('staffInfo', JSON.stringify(data.staff));
       
       // Redirect to healthcare dashboard
       window.location.href = '/healthcare-dashboard';
+
     } catch (err) {
+      console.error('Login error:', err);
       setError('Connection error. Please check your internet and try again.');
     } finally {
       setLoading(false);

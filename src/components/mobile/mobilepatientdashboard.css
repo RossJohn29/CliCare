@@ -1737,17 +1737,16 @@
 }
 
 .mobile-back-btn {
-  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
-  color: white;
-  border: none;
-  padding: 12px 20px;
+  background: #f8f9fa;
+  border: 2px solid #dadce0;
+  padding: 8px 15px;
   border-radius: 10px;
   cursor: pointer;
-  font-weight: 600;
   font-size: 0.9em;
+  font-weight: 600;
   transition: all 0.3s ease;
+  color: #5f6368;
   font-family: 'Poppins', sans-serif;
-  box-shadow: 0 3px 8px rgba(66, 133, 244, 0.3);
 }
 
 .mobile-back-btn:hover {

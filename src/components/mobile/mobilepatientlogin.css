@@ -1,4 +1,4 @@
-/* mobilepatientlogin.css - Mobile-Optimized Patient Login */
+/* mobilepatientlogin.css - FIXED WIDTH to match Terminal design */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
 .mobile-patient-portal {
@@ -7,6 +7,8 @@
   font-family: 'Poppins', sans-serif;
   position: relative;
   padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .mobile-patient-portal::before {
@@ -20,68 +22,100 @@
   pointer-events: none;
 }
 
-/* Mobile Header */
+/* UPDATED: Mobile Header - matches Terminal header */
 .mobile-header {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(15px);
-  padding: 20px 20px 15px 20px;
-  text-align: center;
+  padding: 15px 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   border-bottom: 1px solid rgba(66, 133, 244, 0.2);
   position: relative;
   z-index: 10;
+  min-height: 60px;
 }
 
 .mobile-logo {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: linear-gradient(145deg, #4285f4, #1a73e8);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 1.5em;
+  font-size: 1.3em;
   font-weight: 700;
-  margin: 0 auto 12px auto;
   box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
 }
 
-.mobile-header h1 {
+/* UPDATED: Mobile title - centered like Terminal */
+.mobile-title {
+  flex: 1;
+  text-align: center;
+}
+
+.mobile-title h1 {
   color: #1557b0;
-  font-size: 2.2em;
-  margin: 0 0 5px 0;
+  font-size: 1.8em;
+  margin: 0;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
-.mobile-header p {
+.mobile-title p {
   color: #5f6368;
-  font-size: 0.9em;
-  margin: 0;
+  font-size: 0.85em;
+  margin: 3px 0 0 0;
   font-weight: 500;
 }
 
-/* Mobile Content Container */
-.mobile-content {
-  padding: 25px 20px 30px 20px;
-  position: relative;
-  z-index: 5;
+/* Add hospital info section like Terminal */
+.mobile-hospital-info {
+  text-align: right;
+  color: #5f6368;
 }
 
+.mobile-hospital-info p {
+  margin: 0;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.mobile-hospital-info strong {
+  color: #202124;
+  font-weight: 600;
+}
+
+/* UPDATED: Mobile Content Container - matches Terminal centering and width */
+.mobile-content {
+  flex: 1;
+  padding: 20px;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* UPDATED: Mobile Card - matches Terminal width and sizing */
 .mobile-card {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
   border-radius: 20px;
-  padding: 30px 25px;
-  margin-bottom: 20px;
+  padding: 25px 20px;
+  width: 100%;
+  max-width: 500px; /* CRITICAL: Same max-width as Terminal */
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
 }
 
 /* Welcome Section */
 .mobile-welcome {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 25px;
 }
 
 .mobile-welcome h2 {
@@ -93,9 +127,9 @@
 
 .mobile-welcome p {
   color: #5f6368;
-  font-size: 0.95em;
-  margin: 0;
-  line-height: 1.4;
+  font-size: 0.9em;
+  margin: 0 0 20px 0;
+  font-weight: 500;
 }
 
 /* Patient Type Selection */
@@ -110,7 +144,7 @@
   background: #ffffff;
   border: 2px solid #e8eaed;
   border-radius: 16px;
-  padding: 20px 18px;
+  padding: 18px 15px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
@@ -119,6 +153,7 @@
   position: relative;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  min-height: 80px;
 }
 
 .mobile-patient-btn::before {
@@ -145,7 +180,7 @@
 }
 
 .mobile-patient-btn .icon {
-  font-size: 2.2em;
+  font-size: 2em;
   margin-right: 15px;
   flex-shrink: 0;
   background: linear-gradient(145deg, #e8f0fe, #d2e3fc);
@@ -189,44 +224,72 @@
   color: #dadce0;
   margin-left: 10px;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .mobile-patient-btn:hover .mobile-arrow,
 .mobile-patient-btn:active .mobile-arrow {
   color: #4285f4;
-  transform: translateX(3px);
+  transform: translateX(5px);
 }
 
-/* Login Form */
-.mobile-login-form {
-  text-align: left;
-}
-
+/* UPDATED: Form Header - matches Terminal */
 .mobile-form-header {
   text-align: center;
   margin-bottom: 25px;
+  position: relative;
 }
 
+.mobile-back-btn-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.mobile-back-btn {
+  background: #f8f9fa;
+  border: 2px solid #dadce0;
+  padding: 8px 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  color: #5f6368;
+  font-family: 'Poppins', sans-serif;
+}
+
+.mobile-back-btn:hover {
+  background: #f1f3f4;
+  border-color: #80868b;
+  color: #202124;
+}
+
+/* UPDATED: Patient indicator - matches Terminal */
 .mobile-patient-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
 }
 
 .mobile-indicator {
-  font-size: 2em;
-  padding: 12px;
+  font-size: 2.5em;
+  padding: 15px;
   border-radius: 50%;
   background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
   border: 2px solid #4285f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 70px;
+  height: 70px;
 }
 
 .mobile-form-header h3 {
   color: #202124;
   font-size: 1.4em;
-  margin: 0 0 5px 0;
+  margin: 0 0 8px 0;
   font-weight: 600;
 }
 
@@ -234,6 +297,12 @@
   color: #5f6368;
   font-size: 0.9em;
   margin: 0;
+  font-weight: 400;
+}
+
+/* Login Form */
+.mobile-login-form {
+  text-align: left;
 }
 
 .mobile-input-group {
@@ -271,6 +340,7 @@
   background: #f8f9fa;
   color: #80868b;
   cursor: not-allowed;
+  border-color: #e8eaed;
 }
 
 .mobile-patient-id-input {
@@ -287,7 +357,7 @@
   font-weight: 400;
 }
 
-/* Contact Method Toggle */
+/* UPDATED: Contact Method Toggle - matches Terminal exactly */
 .mobile-method-selection {
   margin-bottom: 20px;
 }
@@ -303,11 +373,11 @@
 
 .mobile-method-btn {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   transition: all 0.3s ease;
   background: transparent;
@@ -321,6 +391,7 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
+/* UPDATED: Contact Group with Send Button - matches Terminal layout */
 .mobile-contact-group {
   display: flex;
   gap: 10px;
@@ -331,6 +402,7 @@
   flex: 1;
 }
 
+/* UPDATED: Send Button - matches Terminal exactly */
 .mobile-send-btn {
   background: linear-gradient(145deg, #34a853 0%, #137333 100%);
   color: white;
@@ -344,15 +416,14 @@
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(52, 168, 83, 0.3);
   font-family: 'Poppins', sans-serif;
-  min-width: 80px;
+  min-width: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
 }
 
-.mobile-send-btn:hover:not(:disabled),
-.mobile-send-btn:active:not(:disabled) {
+.mobile-send-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(52, 168, 83, 0.4);
 }
@@ -423,29 +494,43 @@
   font-size: 0.85em;
 }
 
-/* Action Buttons */
+/* UPDATED: Action Buttons - matches Terminal exactly */
 .mobile-action-btn {
   width: 100%;
-  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
-  color: white;
-  border: none;
   padding: 16px;
+  border: none;
   border-radius: 14px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin: 15px 0;
-  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
   font-family: 'Poppins', sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 55px;
 }
 
-.mobile-action-btn:hover:not(:disabled),
-.mobile-action-btn:active:not(:disabled) {
+.mobile-action-btn.primary {
+  background: linear-gradient(145deg, #34a853 0%, #137333 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(52, 168, 83, 0.3);
+}
+
+.mobile-action-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(52, 168, 83, 0.4);
+}
+
+/* Default blue button for other actions */
+.mobile-action-btn:not(.primary) {
+  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+}
+
+.mobile-action-btn:not(.primary):hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
 }
@@ -455,6 +540,7 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+  color: white;
 }
 
 .mobile-secondary-btn {
@@ -476,24 +562,22 @@
   color: white;
 }
 
-/* Back Button */
-.mobile-back-btn {
-  background: none;
-  border: none;
-  color: #4285f4;
+/* UPDATED: Back Button - matches Terminal style */
+.mobile-back-btn-main {
+  background: #f8f9fa;
+  border: 2px solid #dadce0;
+  padding: 8px 15px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
-  padding: 10px;
-  border-radius: 8px;
+  font-size: 0.9em;
+  font-weight: 600;
   transition: all 0.3s ease;
+  color: #5f6368;
   font-family: 'Poppins', sans-serif;
-  font-weight: 500;
-  margin-top: 15px;
-  width: 100%;
 }
 
-.mobile-back-btn:hover,
-.mobile-back-btn:active {
+.mobile-back-btn-main:hover,
+.mobile-back-btn-main:active {
   background: #e8f0fe;
 }
 
@@ -501,26 +585,29 @@
 .mobile-error {
   background: linear-gradient(145deg, #fce8e6 0%, #fad2cf 100%);
   color: #d93025;
-  padding: 14px;
-  border-radius: 10px;
+  padding: 12px;
+  border-radius: 12px;
   margin-bottom: 20px;
-  border: 1px solid #ea4335;
+  border: 2px solid #ea4335;
   font-weight: 500;
   text-align: center;
   font-family: 'Poppins', sans-serif;
   font-size: 0.9em;
 }
 
-/* Footer */
+/* UPDATED: Footer - matches Terminal footer */
 .mobile-footer {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  padding: 15px 25px;
+  border-top: 1px solid rgba(66, 133, 244, 0.2);
+  position: relative;
+  z-index: 10;
   text-align: center;
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  margin-top: 30px;
 }
 
 .mobile-footer p {
-  color: rgba(255, 255, 255, 0.8);
+  color: #5f6368;
   font-size: 0.8em;
   margin: 0;
   font-weight: 400;
@@ -542,39 +629,52 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Responsive Design */
-@media (max-width: 480px) {
-  .mobile-header {
-    padding: 15px 15px 12px 15px;
-  }
-  
-  .mobile-logo {
-    width: 50px;
-    height: 50px;
-    font-size: 1.3em;
-  }
-  
-  .mobile-header h1 {
-    font-size: 1.8em;
-  }
-  
+/* UPDATED: Responsive Design - maintains Terminal-like proportions */
+@media (max-width: 768px) {
   .mobile-content {
-    padding: 20px 15px 25px 15px;
+    padding: 15px;
   }
   
   .mobile-card {
-    padding: 25px 20px;
+    max-width: 90%; /* Still constrains width on mobile */
+    padding: 20px 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-header {
+    padding: 12px 15px;
+  }
+  
+  .mobile-logo {
+    width: 45px;
+    height: 45px;
+    font-size: 1.2em;
+  }
+  
+  .mobile-title h1 {
+    font-size: 1.6em;
+  }
+  
+  .mobile-content {
+    padding: 10px;
+  }
+  
+  .mobile-card {
+    max-width: 95%;
+    padding: 20px 15px;
     border-radius: 16px;
   }
   
   .mobile-patient-btn {
-    padding: 18px 15px;
+    padding: 15px 12px;
+    min-height: 70px;
   }
   
   .mobile-patient-btn .icon {
     width: 45px;
     height: 45px;
-    font-size: 2em;
+    font-size: 1.8em;
     margin-right: 12px;
   }
   
@@ -586,56 +686,5 @@
   .mobile-send-btn {
     width: 100%;
     min-width: auto;
-  }
-}
-
-@media (max-width: 360px) {
-  .mobile-header h1 {
-    font-size: 1.6em;
-  }
-  
-  .mobile-content {
-    padding: 15px 12px 20px 12px;
-  }
-  
-  .mobile-card {
-    padding: 20px 15px;
-  }
-  
-  .mobile-patient-btn .icon {
-    width: 40px;
-    height: 40px;
-    font-size: 1.8em;
-    margin-right: 10px;
-  }
-  
-  .mobile-btn-content h3 {
-    font-size: 1em;
-  }
-  
-  .mobile-btn-content small {
-    font-size: 0.75em;
-  }
-}
-
-/* Landscape orientation adjustments */
-@media (max-height: 600px) and (orientation: landscape) {
-  .mobile-header {
-    padding: 10px 20px 8px 20px;
-  }
-  
-  .mobile-logo {
-    width: 45px;
-    height: 45px;
-    font-size: 1.2em;
-  }
-  
-  .mobile-header h1 {
-    font-size: 1.6em;
-    margin-bottom: 2px;
-  }
-  
-  .mobile-content {
-    padding: 15px 20px 20px 20px;
   }
 }

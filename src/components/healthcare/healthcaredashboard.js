@@ -24,63 +24,68 @@ const HealthcareDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Load staff info from session
-    const staffId = sessionStorage.getItem('staffId') || 'DR001';
-    const staffType = sessionStorage.getItem('staffType') || 'doctor';
+  // Load staff info from session
+    const token = sessionStorage.getItem('healthcareToken');
+    const staffInfo = sessionStorage.getItem('staffInfo');
     
-    // Only allow doctors
-    if (staffType !== 'doctor') {
-      alert('Access denied. This system is for doctors only.');
+    // Check authentication
+    if (!token || !staffInfo) {
+      alert('Please log in first.');
       window.location.href = '/healthcare-login';
       return;
     }
-    
-    const staffNames = {
-      'DR001': 'Dr. Maria Santos',
-      'DR002': 'Dr. Juan Dela Cruz'
-    };
 
-    const departments = {
-      'DR001': 'Internal Medicine',
-      'DR002': 'Cardiology'
-    };
-
-    setStaffInfo({
-      staffId: staffId,
-      name: staffNames[staffId] || 'Dr. Healthcare Provider',
-      role: 'Attending Physician',
-      department: departments[staffId] || 'General Medicine',
-      staffType: 'doctor'
-    });
-
-    // Mock dashboard data loading
-    const loadDashboardData = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const parsedStaffInfo = JSON.parse(staffInfo);
       
-      setDashboardData({
-        todayStats: { 
-          myPatients: 12, 
-          labResults: 8 
-        },
-        recentActivity: [
-          { time: '14:45', action: 'Patient consultation completed', patient: 'PAT789', status: 'success' },
-          { time: '14:30', action: 'Lab results reviewed', patient: 'PAT456', status: 'success' },
-          { time: '14:15', action: 'Prescription updated', patient: 'PAT123', status: 'success' },
-          { time: '13:50', action: 'New lab order created', patient: 'PAT321', status: 'info' },
-          { time: '13:35', action: 'Patient history updated', patient: 'PAT654', status: 'success' }
-        ],
-        patientQueue: [
-          { time: '15:00', patient: 'Maria Cruz', id: 'PAT001', status: 'waiting', priority: 'normal' },
-          { time: '15:15', patient: 'John Santos', id: 'PAT002', status: 'ready', priority: 'urgent' },
-          { time: '15:30', patient: 'Ana Garcia', id: 'PAT003', status: 'scheduled', priority: 'normal' },
-          { time: '15:45', patient: 'Carlos Reyes', id: 'PAT004', status: 'waiting', priority: 'high' },
-          { time: '16:00', patient: 'Lisa Tan', id: 'PAT005', status: 'scheduled', priority: 'normal' }
-        ]
+      // Only allow doctors
+      if (parsedStaffInfo.role !== 'Doctor') {
+        alert('Access denied. This system is for doctors only.');
+        window.location.href = '/healthcare-login';
+        return;
+      }
+      
+      setStaffInfo({
+        staffId: parsedStaffInfo.staff_id,
+        name: parsedStaffInfo.name,
+        role: 'Attending Physician',
+        department: parsedStaffInfo.specialization || 'General Medicine',
+        staffType: 'doctor'
       });
-      setLoading(false);
-    };
 
-    loadDashboardData();
+      // Load dashboard data (you can make this real API calls later)
+      const loadDashboardData = async () => {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        setDashboardData({
+          todayStats: { 
+            myPatients: 12, 
+            labResults: 8 
+          },
+          recentActivity: [
+            { time: '14:45', action: 'Patient consultation completed', patient: 'PAT789', status: 'success' },
+            { time: '14:30', action: 'Lab results reviewed', patient: 'PAT456', status: 'success' },
+            { time: '14:15', action: 'Prescription updated', patient: 'PAT123', status: 'success' },
+            { time: '13:50', action: 'New lab order created', patient: 'PAT321', status: 'info' },
+            { time: '13:35', action: 'Patient history updated', patient: 'PAT654', status: 'success' }
+          ],
+          patientQueue: [
+            { time: '15:00', patient: 'Maria Cruz', id: 'PAT001', status: 'waiting', priority: 'normal' },
+            { time: '15:15', patient: 'John Santos', id: 'PAT002', status: 'ready', priority: 'urgent' },
+            { time: '15:30', patient: 'Ana Garcia', id: 'PAT003', status: 'scheduled', priority: 'normal' },
+            { time: '15:45', patient: 'Carlos Reyes', id: 'PAT004', status: 'waiting', priority: 'high' },
+            { time: '16:00', patient: 'Lisa Tan', id: 'PAT005', status: 'scheduled', priority: 'normal' }
+          ]
+        });
+        setLoading(false);
+      };
+
+      loadDashboardData();
+
+    } catch (error) {
+      console.error('Error parsing staff info:', error);
+      window.location.href = '/healthcare-login';
+    }
   }, []);
 
   const handleLogout = () => {

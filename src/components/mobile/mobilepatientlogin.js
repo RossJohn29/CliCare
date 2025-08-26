@@ -40,22 +40,34 @@ const MobilePatientLogin = () => {
     setError('');
 
     try {
-      // Mock API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock validation
-      const validPatients = ['PAT001', 'PAT002', 'PAT123', 'PAT456'];
-      
-      if (!validPatients.includes(credentials.patientId.toUpperCase())) {
-        setError('Patient ID not found. Try: PAT001, PAT002, PAT123, or PAT456');
+      // Make API request to backend
+      const response = await fetch('http://localhost:5000/api/outpatient/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          patientId: credentials.patientId.toUpperCase(),
+          contactInfo: contactValue,
+          contactType: loginMethod
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to send verification code');
         setSendingCode(false);
         return;
       }
 
-      // Mock successful code sending
+      // Success
       setCodeSent(true);
-      alert('📱 OTP sent successfully! For testing, use: 123456');
+      alert(`📱 Verification code sent successfully to your ${loginMethod}!`);
+
     } catch (err) {
+      console.error('Send OTP error:', err);
       setError('Connection error. Please try again.');
     } finally {
       setSendingCode(false);
@@ -85,25 +97,42 @@ const MobilePatientLogin = () => {
         return;
       }
 
-      // Mock API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock OTP validation
-      if (credentials.otp !== '123456') {
-        setError('Invalid verification code. Please try again.');
+      const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
+
+      // Make API request to backend
+      const response = await fetch('http://localhost:5000/api/outpatient/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          patientId: credentials.patientId.toUpperCase(),
+          contactInfo: contactValue,
+          otp: credentials.otp,
+          deviceType: 'mobile'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Login failed. Please check your verification code.');
         setLoading(false);
         return;
       }
 
-      // Mock successful login
-      sessionStorage.setItem('patientId', credentials.patientId.toUpperCase());
-      sessionStorage.setItem('patientName', 'Returning Patient');
+      // Store authentication data
+      sessionStorage.setItem('patientToken', data.token);
+      sessionStorage.setItem('patientId', data.patient.patient_id);
+      sessionStorage.setItem('patientName', data.patient.name);
+      sessionStorage.setItem('patientInfo', JSON.stringify(data.patient));
       
-      alert('🎉 Login successful! Welcome back to CLICARE!');
-      
-      // Use window.location.href for direct navigation
+      // Redirect to mobile patient dashboard (keeping existing flow)
       window.location.href = '/mobile-patient-dashboard';
+
     } catch (err) {
+      console.error('Login error:', err);
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
@@ -158,6 +187,12 @@ const MobilePatientLogin = () => {
   const renderOldPatientLogin = () => (
     <div className="mobile-card">
       <div className="mobile-form-header">
+        <div className="mobile-back-btn-container">
+          <button onClick={resetForm} className="mobile-back-btn">
+            ← Back
+          </button>
+        </div>
+
         <div className="mobile-patient-indicator">
           <span className="mobile-indicator">👤</span>
         </div>
@@ -285,6 +320,12 @@ const MobilePatientLogin = () => {
   const renderNewPatientRedirect = () => (
     <div className="mobile-card">
       <div className="mobile-form-header">
+        <div className="mobile-back-btn-container">
+          <button onClick={resetForm} className="mobile-back-btn">
+            ← Back
+          </button>
+        </div>
+
         <div className="mobile-patient-indicator">
           <span className="mobile-indicator">✨</span>
         </div>
@@ -331,8 +372,14 @@ const MobilePatientLogin = () => {
     <div className="mobile-patient-portal">
       <div className="mobile-header">
         <div className="mobile-logo">🏥</div>
-        <h1>CLICARE</h1>
-        <p>Mobile Patient Portal</p>
+        <div className="mobile-title">
+          <h1>CLICARE</h1>
+          <p>Digital Patient Management</p>
+        </div>
+        <div className="mobile-hospital-info">
+          <p><strong>Mobile Portal</strong></p>
+          <p>Patient Access</p>
+        </div>
       </div>
       
       <div className="mobile-content">
@@ -342,11 +389,6 @@ const MobilePatientLogin = () => {
         {patientType === 'old' && renderOldPatientLogin()}
         {patientType === 'new' && renderNewPatientRedirect()}
         
-        {patientType && (
-          <button onClick={resetForm} className="mobile-back-btn">
-            ← Back to main menu
-          </button>
-        )}
       </div>
 
       <div className="mobile-footer">
