@@ -1,14 +1,10 @@
-// src/services/adminApi.js - Frontend API Service for Admin Operations
-
-// API Configuration
+// adminApi.js
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Helper function to get auth token from sessionStorage
 const getAuthToken = () => {
-  return sessionStorage.getItem('adminToken');
+  return localStorage.getItem('adminToken');
 };
 
-// Helper function to create authenticated headers
 const getAuthHeaders = () => {
   const token = getAuthToken();
   return {
@@ -17,7 +13,6 @@ const getAuthHeaders = () => {
   };
 };
 
-// Generic API call function with error handling
 const apiCall = async (endpoint, options = {}) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -33,7 +28,6 @@ const apiCall = async (endpoint, options = {}) => {
 
     const response = await fetch(url, config);
     
-    // Handle different response types
     let data;
     const contentType = response.headers.get('Content-Type');
     
@@ -44,12 +38,9 @@ const apiCall = async (endpoint, options = {}) => {
     }
 
     if (!response.ok) {
-      // Handle specific HTTP status codes
       switch (response.status) {
         case 401:
-          // Unauthorized - clear token and redirect to login
-          sessionStorage.removeItem('adminToken');
-          sessionStorage.removeItem('adminId');
+          localStorage.clear();
           window.location.href = '/admin-login';
           throw new Error(data.error || 'Unauthorized access');
         
@@ -73,7 +64,6 @@ const apiCall = async (endpoint, options = {}) => {
     return data;
 
   } catch (error) {
-    // Network errors or other issues
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       throw new Error('Unable to connect to server. Please check your connection.');
     }
@@ -82,31 +72,26 @@ const apiCall = async (endpoint, options = {}) => {
   }
 };
 
-// Admin API Functions
 export const adminApi = {
-  // Health check
   healthCheck: async () => {
     return apiCall('/health');
   },
 
-  // Admin Authentication
   login: async (credentials) => {
     const response = await apiCall('/admin/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
 
-    // Store token and admin info on successful login
     if (response.success && response.token) {
-      sessionStorage.setItem('adminToken', response.token);
-      sessionStorage.setItem('adminId', response.admin.healthadmin_id);
-      sessionStorage.setItem('adminInfo', JSON.stringify(response.admin));
+      localStorage.setItem('adminToken', response.token);
+      localStorage.setItem('adminId', response.admin.healthadmin_id);
+      localStorage.setItem('adminInfo', JSON.stringify(response.admin));
     }
 
     return response;
   },
 
-  // Logout
   logout: async () => {
     try {
       await apiCall('/admin/logout', {
@@ -114,24 +99,20 @@ export const adminApi = {
         headers: getAuthHeaders(),
       });
     } catch (error) {
-      // Even if API call fails, clear local storage
       console.warn('Logout API call failed:', error);
     } finally {
-      // Clear local storage
-      sessionStorage.removeItem('adminToken');
-      sessionStorage.removeItem('adminId');
-      sessionStorage.removeItem('adminInfo');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminId');
+      localStorage.removeItem('adminInfo');
     }
   },
 
-  // Get admin profile
   getProfile: async () => {
     return apiCall('/admin/profile', {
       headers: getAuthHeaders(),
     });
   },
 
-  // Validate token
   validateToken: async () => {
     return apiCall('/admin/validate-token', {
       method: 'POST',
@@ -139,14 +120,12 @@ export const adminApi = {
     });
   },
 
-  // Dashboard data
   getDashboardStats: async () => {
     return apiCall('/admin/dashboard-stats', {
       headers: getAuthHeaders(),
     });
   },
 
-  // Get all admins
   getAllAdmins: async () => {
     return apiCall('/admin/all', {
       headers: getAuthHeaders(),
@@ -154,21 +133,35 @@ export const adminApi = {
   },
 };
 
-// Utility functions for frontend
 export const adminUtils = {
-  // Check if user is authenticated
   isAuthenticated: () => {
     const token = getAuthToken();
     return !!token;
   },
 
-  // Get stored admin info
+  isTokenExpired: () => {
+    const token = getAuthToken();
+    if (!token) return true;
+    
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) return true;
+      
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const now = Date.now() / 1000;
+      
+      return payload.exp && payload.exp < (now + 30);
+    } catch (error) {
+      console.warn('Token parsing error:', error);
+      return true;
+    }
+  },
+
   getAdminInfo: () => {
-    const adminInfoString = sessionStorage.getItem('adminInfo');
+    const adminInfoString = localStorage.getItem('adminInfo');
     return adminInfoString ? JSON.parse(adminInfoString) : null;
   },
 
-  // Auto-refresh token before expiration (call this periodically)
   refreshTokenIfNeeded: async () => {
     try {
       await adminApi.validateToken();
@@ -179,19 +172,16 @@ export const adminUtils = {
     }
   },
 
-  // Format admin display name
   formatAdminName: (admin) => {
     if (!admin) return 'Unknown Admin';
     return admin.name || 'Admin User';
   },
 
-  // Format admin position
   formatAdminPosition: (admin) => {
     if (!admin) return 'Unknown Position';
     return admin.position || 'Administrator';
   },
 
-  // Error message formatter
   formatErrorMessage: (error) => {
     if (typeof error === 'string') return error;
     if (error && error.message) return error.message;
@@ -199,5 +189,4 @@ export const adminUtils = {
   },
 };
 
-// Export default
 export default adminApi;

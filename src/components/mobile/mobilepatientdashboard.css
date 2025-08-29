@@ -57,7 +57,7 @@
 
 .patient-mobile-title {
   font-size: 1.1em;
-  font-weight: 700;
+  font-weight: 600;
   color: #1557b0;
 }
 
@@ -329,7 +329,7 @@
   color: #202124;
   font-size: 2em;
   margin: 0 0 8px 0;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .patient-page-header p {
@@ -343,16 +343,6 @@
 .patient-loading-container {
   text-align: center;
   padding: 60px 20px;
-}
-
-.patient-loading-spinner {
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #4285f4;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 20px auto;
 }
 
 @keyframes spin {
@@ -413,7 +403,7 @@
 .patient-stat-number {
   color: #202124;
   font-size: 2.2em;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 4px;
   line-height: 1;
 }
@@ -600,7 +590,7 @@
 }
 
 .patient-lab-request-id {
-  font-weight: 700;
+  font-weight: 600;
   color: #4285f4;
   font-size: 1em;
 }
@@ -1111,7 +1101,7 @@
 
 .mobile-mobile-title {
   font-size: 1.1em;
-  font-weight: 700;
+  font-weight: 600;
   color: #1557b0;
 }
 
@@ -1386,7 +1376,7 @@
   color: #202124;
   font-size: 1.6em;
   margin: 0 0 8px 0;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .mobile-page-header p {
@@ -1403,13 +1393,13 @@
 }
 
 .mobile-loading-spinner {
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #4285f4;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 12px;
+  height: 12px;
   animation: spin 1s linear infinite;
-  margin: 0 auto 20px auto;
+  display: inline-block;
 }
 
 @keyframes spin {
@@ -1470,7 +1460,7 @@
 .mobile-stat-number {
   color: #202124;
   font-size: 1.8em;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 4px;
   line-height: 1;
 }
@@ -1646,7 +1636,7 @@
 }
 
 .mobile-lab-request-id {
-  font-weight: 700;
+  font-weight: 600;
   color: #4285f4;
   font-size: 0.9em;
 }

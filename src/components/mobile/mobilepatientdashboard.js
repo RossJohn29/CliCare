@@ -1,4 +1,4 @@
-// mobilepatientdashboard.js - CLICARE Patient Dashboard Component (Web App Design)
+// mobilepatientdashboard.js
 import React, { useState, useEffect } from 'react';
 import './mobilepatientdashboard.css';
 
@@ -25,18 +25,33 @@ const MobilePatientDashboard = () => {
   const [showAppointmentConfirm, setShowAppointmentConfirm] = useState(false);
 
   useEffect(() => {
-    // Load patient info from session
-    const patientId = sessionStorage.getItem('patientId') || 'PAT001';
-    const patientName = sessionStorage.getItem('patientName') || 'Patient User';
+    // Load patient info from localStorage (changed from sessionStorage)
+    const patientId = localStorage.getItem('patientId') || 'PAT001';
+    const patientName = localStorage.getItem('patientName') || 'Patient User';
+    const storedPatientInfo = localStorage.getItem('patientInfo');
+    
+    // Parse the full patient info if available
+    let fullPatientInfo = {};
+    if (storedPatientInfo) {
+      try {
+        fullPatientInfo = JSON.parse(storedPatientInfo);
+      } catch (error) {
+        console.warn('Failed to parse stored patient info:', error);
+      }
+    }
     
     setPatientInfo({
-      patientId: patientId,
-      name: patientName,
-      email: 'patient@example.com',
-      contactNumber: '09171234567'
+      patientId: fullPatientInfo.patient_id || patientId,
+      name: fullPatientInfo.name || patientName,
+      email: fullPatientInfo.email || 'patient@example.com',
+      contactNumber: fullPatientInfo.contact_no || '09171234567',
+      birthday: fullPatientInfo.birthday || '',
+      age: fullPatientInfo.age || '',
+      sex: fullPatientInfo.sex || '',
+      address: fullPatientInfo.address || ''
     });
 
-    // Mock dashboard data loading
+    // Mock dashboard data loading - keep this part the same
     const loadDashboardData = async () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
@@ -95,10 +110,8 @@ const MobilePatientDashboard = () => {
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
-      sessionStorage.removeItem('patientToken');
-      sessionStorage.removeItem('patientId');
-      sessionStorage.removeItem('patientName');
-      window.location.href = '/mobile-patient-login';
+      localStorage.clear(); // Changed from sessionStorage
+      window.location.replace('/mobile-patient-login');
     }
   };
 
@@ -334,7 +347,7 @@ const MobilePatientDashboard = () => {
         </button>
         <div className="patient-mobile-logo">
           <span className="patient-mobile-icon">🏥</span>
-          <span className="patient-mobile-title">CLICARE Patient</span>
+          <span className="patient-mobile-title">CliCare Patient</span>
         </div>
         <button className="patient-mobile-logout" onClick={handleLogout}>
           🚪
@@ -347,7 +360,7 @@ const MobilePatientDashboard = () => {
           <div className="patient-sidebar-logo">
             <span className="patient-sidebar-icon">🏥</span>
             <div className="patient-sidebar-text">
-              <h1>CLICARE</h1>
+              <h1>CliCare</h1>
               <p>Patient Portal</p>
             </div>
           </div>

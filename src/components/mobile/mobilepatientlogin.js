@@ -1,10 +1,10 @@
-// mobilepatientlogin.js - Mobile-Optimized Patient Login Component
-import React, { useState } from 'react';
+// mobilepatientlogin.js
+import React, { useState, useEffect } from 'react';
 import './mobilepatientlogin.css';
 
 const MobilePatientLogin = () => {
-  const [patientType, setPatientType] = useState(''); // 'old' or 'new'
-  const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone'
+  const [patientType, setPatientType] = useState('');
+  const [loginMethod, setLoginMethod] = useState('email');
   const [credentials, setCredentials] = useState({
     patientId: '',
     email: '',
@@ -15,18 +15,33 @@ const MobilePatientLogin = () => {
   const [sendingCode, setSendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState('');
+  const [countdown, setCountdown] = useState(0);
+  const [justSent, setJustSent] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const handleInputChange = (e) => {
-    setCredentials({
-      ...credentials,
-      [e.target.name]: e.target.value
-    });
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+    setError('');
+  };
+
+  const handleMethodSwitch = (method) => {
+    setLoginMethod(method);
+    setCodeSent(false);
+    setJustSent(false);
+    setCredentials((prev) => ({ ...prev, otp: '' }));
     setError('');
   };
 
   const handleSendOTP = async () => {
     if (!credentials.patientId) {
-      setError('Please enter your Patient ID first');
+      setError('Please enter your Patient ID');
       return;
     }
 
@@ -40,12 +55,9 @@ const MobilePatientLogin = () => {
     setError('');
 
     try {
-      // Make API request to backend
       const response = await fetch('http://localhost:5000/api/outpatient/send-otp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           patientId: credentials.patientId.toUpperCase(),
@@ -62,13 +74,16 @@ const MobilePatientLogin = () => {
         return;
       }
 
-      // Success
       setCodeSent(true);
-      alert(`📱 Verification code sent successfully to your ${loginMethod}!`);
-
+      setJustSent(true);
+      
+      setTimeout(() => {
+        setJustSent(false);
+        setCountdown(120);
+      }, 2000);
     } catch (err) {
       console.error('Send OTP error:', err);
-      setError('Connection error. Please try again.');
+      setError('Connection error. Please check your internet and try again.');
     } finally {
       setSendingCode(false);
     }
@@ -84,13 +99,11 @@ const MobilePatientLogin = () => {
         setLoading(false);
         return;
       }
-
       if (!codeSent) {
         setError('Please send verification code first');
         setLoading(false);
         return;
       }
-
       if (!credentials.otp) {
         setError('Please enter the verification code');
         setLoading(false);
@@ -99,12 +112,9 @@ const MobilePatientLogin = () => {
 
       const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
 
-      // Make API request to backend
       const response = await fetch('http://localhost:5000/api/outpatient/verify-otp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           patientId: credentials.patientId.toUpperCase(),
@@ -122,15 +132,12 @@ const MobilePatientLogin = () => {
         return;
       }
 
-      // Store authentication data
-      sessionStorage.setItem('patientToken', data.token);
-      sessionStorage.setItem('patientId', data.patient.patient_id);
-      sessionStorage.setItem('patientName', data.patient.name);
-      sessionStorage.setItem('patientInfo', JSON.stringify(data.patient));
-      
-      // Redirect to mobile patient dashboard (keeping existing flow)
-      window.location.href = '/mobile-patient-dashboard';
+      localStorage.setItem('patientToken', data.token);
+      localStorage.setItem('patientId', data.patient.patient_id);
+      localStorage.setItem('patientName', data.patient.name);
+      localStorage.setItem('patientInfo', JSON.stringify(data.patient));
 
+      window.location.href = '/mobile-patient-dashboard';
     } catch (err) {
       console.error('Login error:', err);
       setError('Connection error. Please try again.');
@@ -139,70 +146,59 @@ const MobilePatientLogin = () => {
     }
   };
 
-  const resetForm = () => {
-    setPatientType('');
-    setLoginMethod('email');
-    setCredentials({ patientId: '', email: '', phoneNumber: '', otp: '' });
-    setCodeSent(false);
-    setError('');
-  };
-
+  /* Patient Type Selection */
   const renderPatientTypeSelection = () => (
     <div className="mobile-card">
-      <div className="mobile-welcome">
-        <h2>Welcome to CLICARE</h2>
-        <p>Your digital healthcare companion. Choose your access type below.</p>
+      <div className="mobile-form-header">
+        <div className="mobile-patient-indicator">
+          <span className="mobile-indicator">
+            <i className="fa-regular fa-hospital"></i>
+          </span>
+        </div>
+        <h3>Welcome to CliCare</h3>
+        <p>Choose your access type below</p>
       </div>
-      
+
       <div className="mobile-patient-types">
-        <button 
-          onClick={() => setPatientType('old')}
-          className="mobile-patient-btn"
-        >
-          <div className="icon">👤</div>
+        <button onClick={() => setPatientType('old')} className="mobile-patient-btn">
+          <div className="icon"><i className="fa-solid fa-user"></i></div>
           <div className="mobile-btn-content">
             <h3>Returning Patient</h3>
             <p>I have a Patient ID</p>
             <small>Access your medical records and book appointments</small>
           </div>
-          <div className="mobile-arrow">→</div>
         </button>
-        
-        <button 
-          onClick={() => setPatientType('new')}
-          className="mobile-patient-btn"
-        >
-          <div className="icon">✨</div>
+
+        <button onClick={() => setPatientType('new')} className="mobile-patient-btn">
+          <div className="icon"><i className="fa-solid fa-user-plus"></i></div>
           <div className="mobile-btn-content">
             <h3>New Patient</h3>
             <p>First time here</p>
             <small>Create your patient account in minutes</small>
           </div>
-          <div className="mobile-arrow">→</div>
         </button>
       </div>
     </div>
   );
 
+  /* Old Patient */
   const renderOldPatientLogin = () => (
     <div className="mobile-card">
       <div className="mobile-form-header">
-        <div className="mobile-back-btn-container">
-          <button onClick={resetForm} className="mobile-back-btn">
-            ← Back
-          </button>
-        </div>
-
         <div className="mobile-patient-indicator">
-          <span className="mobile-indicator">👤</span>
+          <span className="mobile-indicator">
+            <i className="fa-regular fa-user"></i>
+          </span>
         </div>
         <h3>Welcome Back!</h3>
         <p>Enter your details to access your account</p>
       </div>
 
+      {error && <div className="mobile-error">{error}</div>}
+
       <div className="mobile-login-form">
         <div className="mobile-input-group">
-          <label>Patient ID *</label>
+          <label>Patient ID</label>
           <input
             type="text"
             name="patientId"
@@ -211,8 +207,12 @@ const MobilePatientLogin = () => {
             placeholder="Enter Patient ID (e.g., PAT001)"
             className="mobile-form-input mobile-patient-id-input"
             required
+            autoComplete="off"
+            spellCheck="false"
           />
-          <small className="mobile-input-hint">Found on your patient card or previous visit documents</small>
+          <small className="mobile-input-hint">
+            Found on your patient card or previous visit documents
+          </small>
         </div>
 
         <div className="mobile-input-group">
@@ -221,54 +221,46 @@ const MobilePatientLogin = () => {
             <div className="mobile-method-toggle">
               <button
                 type="button"
-                onClick={() => {
-                  setLoginMethod('email');
-                  setCodeSent(false);
-                  setCredentials(prev => ({ ...prev, otp: '' }));
-                }}
+                onClick={() => handleMethodSwitch('email')}
                 className={`mobile-method-btn ${loginMethod === 'email' ? 'active' : ''}`}
               >
-                📧 Email
+                <i className="fa-solid fa-envelope"></i> Email
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setLoginMethod('phone');
-                  setCodeSent(false);
-                  setCredentials(prev => ({ ...prev, otp: '' }));
-                }}
+                onClick={() => handleMethodSwitch('phone')}
                 className={`mobile-method-btn ${loginMethod === 'phone' ? 'active' : ''}`}
               >
-                📱 SMS
+                <i className="fa-solid fa-phone"></i> SMS
               </button>
             </div>
           </div>
-
-          <label>{loginMethod === 'email' ? 'Email Address' : 'Phone Number'} *</label>
+          
+          <label>{loginMethod === 'email' ? 'Email Address' : 'Phone Number'}</label>
           <div className="mobile-contact-group">
             <input
               type={loginMethod === 'email' ? 'email' : 'tel'}
               name={loginMethod === 'email' ? 'email' : 'phoneNumber'}
               value={loginMethod === 'email' ? credentials.email : credentials.phoneNumber}
               onChange={handleInputChange}
-              placeholder={loginMethod === 'email' ? 'your@email.com' : '09XX-XXX-XXXX'}
+              placeholder={loginMethod === 'email' ? 'you@example.com' : '09XX-XXX-XXXX'}
               className="mobile-form-input"
               required
+              autoComplete="off"
             />
             <button
               type="button"
               onClick={handleSendOTP}
-              disabled={sendingCode || !credentials.patientId || (!credentials.email && !credentials.phoneNumber)}
-              className="mobile-send-btn"
+              className="mobile-otp-send-btn"
+              disabled={sendingCode || justSent || countdown > 0}
             >
-              {sendingCode ? (
-                <>
-                  <span className="mobile-loading-spinner"></span>
-                  Send
-                </>
-              ) : (
-                'Send Code'
-              )}
+              {sendingCode
+                ? (<><span className="mobile-loading-spinner"></span> Sending...</>)
+                : justSent
+                  ? 'Sent'
+                  : countdown > 0
+                    ? `Resend in ${countdown}s`
+                    : 'Send Code'}
             </button>
           </div>
           <small className="mobile-input-hint">
@@ -276,9 +268,8 @@ const MobilePatientLogin = () => {
           </small>
         </div>
 
-        {/* OTP Verification Code Input */}
         <div className="mobile-input-group">
-          <label>Verification Code *</label>
+          <label>Verification Code</label>
           <input
             type="text"
             name="otp"
@@ -287,83 +278,72 @@ const MobilePatientLogin = () => {
             placeholder="Enter 6-digit verification code"
             className="mobile-form-input"
             maxLength="6"
-            disabled={!codeSent}
+            disabled={sendingCode}
             required
           />
           <small className="mobile-input-hint">
-            {codeSent 
-              ? `Code sent to your ${loginMethod}. Please check and enter the 6-digit code.`
-              : 'Please send verification code first'
+            {codeSent
+              ? (<><i className="fa-solid fa-square-check"></i> Code sent to your {loginMethod}</>)
+              : (<><i className="fa-solid fa-triangle-exclamation"></i> Please send verification code first</>)
             }
           </small>
         </div>
 
-        <button
-          type="button"
-          onClick={handleLogin}
-          disabled={loading || !credentials.patientId || !credentials.otp || !codeSent}
-          className="mobile-action-btn"
-        >
-          {loading ? (
-            <>
-              <span className="mobile-loading-spinner"></span>
-              Verifying...
-            </>
-          ) : (
-            '🏥 Access CLICARE'
-          )}
+        <button type="button" onClick={handleLogin} className="mobile-access-btn">
+          Sign In
         </button>
+
+        <div className="mobile-account-toggle">
+          <p>
+            Don't have an account?{' '}
+            <button onClick={() => setPatientType('new')} className="mobile-account-link">
+              Register here
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
 
+  /* New Patient Registration */
   const renderNewPatientRedirect = () => (
     <div className="mobile-card">
       <div className="mobile-form-header">
-        <div className="mobile-back-btn-container">
-          <button onClick={resetForm} className="mobile-back-btn">
-            ← Back
-          </button>
-        </div>
-
         <div className="mobile-patient-indicator">
-          <span className="mobile-indicator">✨</span>
+          <span className="mobile-indicator">
+            <i className="fa-solid fa-user-plus"></i>
+          </span>
         </div>
         <h3>Create Your Account</h3>
-        <p>Join CLICARE for better healthcare management</p>
+        <p>Join CliCare for better healthcare management</p>
       </div>
 
       <div className="mobile-reg-info">
         <div className="mobile-info-card">
-          <h4>📋 Quick Registration Process:</h4>
+          <h4>Quick Registration Process:</h4>
           <ul className="mobile-info-list">
-            <li>Personal information (name, age, contact)</li>
-            <li>Emergency contact details</li>
-            <li>Optional ID scan for faster setup</li>
-            <li>Review and confirm your details</li>
+            <li><i className="fa-solid fa-check"></i> Personal information (name, age, contact)</li>
+            <li><i className="fa-solid fa-check"></i> Emergency contact details</li>
+            <li><i className="fa-solid fa-check"></i> Optional ID scan for faster setup</li>
+            <li><i className="fa-solid fa-check"></i> Review and confirm your details</li>
           </ul>
-        </div>
-        
-        <div className="mobile-time-estimate">
-          <p>⏱️ Takes only 3-5 minutes to complete</p>
         </div>
       </div>
 
-      <button 
-        onClick={() => window.location.href = '/mobile-patient-register'}
-        className="mobile-action-btn"
+      <button
+        onClick={() => (window.location.href = '/mobile-patient-register')}
+        className="mobile-access-btn"
       >
-        🚀 Start Registration
+        Start Registration
       </button>
 
-      <div style={{ textAlign: 'center', marginTop: '20px' }}>
-        <p style={{ color: '#5f6368', fontSize: '0.9em', marginBottom: '10px' }}>Already have an account?</p>
-        <button 
-          onClick={() => setPatientType('old')}
-          className="mobile-secondary-btn"
-        >
-          Login as Returning Patient
-        </button>
+      <div className="mobile-account-toggle">
+        <p>
+          Already have an account?{' '}
+          <button onClick={() => setPatientType('old')} className="mobile-account-link">
+            Sign in
+          </button>
+        </p>
       </div>
     </div>
   );
@@ -371,9 +351,9 @@ const MobilePatientLogin = () => {
   return (
     <div className="mobile-patient-portal">
       <div className="mobile-header">
-        <div className="mobile-logo">🏥</div>
+        <div className="mobile-logo">CliCare</div>
         <div className="mobile-title">
-          <h1>CLICARE</h1>
+          <h1>CliCare</h1>
           <p>Digital Patient Management</p>
         </div>
         <div className="mobile-hospital-info">
@@ -381,18 +361,15 @@ const MobilePatientLogin = () => {
           <p>Patient Access</p>
         </div>
       </div>
-      
+
       <div className="mobile-content">
-        {error && <div className="mobile-error">⚠️ {error}</div>}
-        
         {!patientType && renderPatientTypeSelection()}
         {patientType === 'old' && renderOldPatientLogin()}
         {patientType === 'new' && renderNewPatientRedirect()}
-        
       </div>
 
       <div className="mobile-footer">
-        <p>🔒 Secure patient access • Need help? Tap to call (02) 8123-4567</p>
+        <p>Secure patient access • Need help? Tap to call (02) 8123-4567</p>
       </div>
     </div>
   );

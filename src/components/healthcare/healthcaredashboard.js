@@ -1,6 +1,23 @@
-// healthcaredashboard.js - CLICARE Healthcare Dashboard Component (Doctor Only)
+// healthcaredashboard.js
 import React, { useState, useEffect } from 'react';
 import './healthcaredashboard.css';
+
+const validateHealthcareToken = async () => {
+  const token = localStorage.getItem('healthcareToken');  // Changed from sessionStorage
+  if (!token) return false;
+  
+  try {
+    const response = await fetch('http://localhost:5000/api/healthcare/profile', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
 
 const HealthcareDashboard = () => {
   const [currentPage, setCurrentPage] = useState('overview');
@@ -24,27 +41,36 @@ const HealthcareDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-  // Load staff info from session
-    const token = sessionStorage.getItem('healthcareToken');
-    const staffInfo = sessionStorage.getItem('staffInfo');
-    
-    // Check authentication
-    if (!token || !staffInfo) {
-      alert('Please log in first.');
-      window.location.href = '/healthcare-login';
-      return;
-    }
-
+  const initializeDashboard = async () => {
     try {
+      // Check if user is authenticated
+      const token = localStorage.getItem('healthcareToken'); 
+      const staffInfo = localStorage.getItem('staffInfo');   
+      
+      if (!token || !staffInfo) {
+        window.location.replace('/healthcare-login');
+        return;
+      }
+
+      // Validate token
+      const isValid = await validateHealthcareToken();
+      if (!isValid) {
+        localStorage.clear();  // Changed from sessionStorage
+        window.location.replace('/healthcare-login');
+        return;
+      }
+
+      // Parse and validate staff info
       const parsedStaffInfo = JSON.parse(staffInfo);
       
       // Only allow doctors
       if (parsedStaffInfo.role !== 'Doctor') {
         alert('Access denied. This system is for doctors only.');
-        window.location.href = '/healthcare-login';
+        window.location.replace('/healthcare-login');
         return;
       }
       
+      // Set staff info state
       setStaffInfo({
         staffId: parsedStaffInfo.staff_id,
         name: parsedStaffInfo.name,
@@ -53,7 +79,7 @@ const HealthcareDashboard = () => {
         staffType: 'doctor'
       });
 
-      // Load dashboard data (you can make this real API calls later)
+      // Load dashboard data
       const loadDashboardData = async () => {
         await new Promise(resolve => setTimeout(resolve, 1500));
         
@@ -84,16 +110,18 @@ const HealthcareDashboard = () => {
 
     } catch (error) {
       console.error('Error parsing staff info:', error);
-      window.location.href = '/healthcare-login';
+      localStorage.clear();  // Changed from sessionStorage
+      window.location.replace('/healthcare-login');
     }
+  };
+
+  initializeDashboard();
   }, []);
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
-      sessionStorage.removeItem('healthcareToken');
-      sessionStorage.removeItem('staffId');
-      sessionStorage.removeItem('staffType');
-      window.location.href = '/healthcare-login';
+      localStorage.clear();  // Changed from sessionStorage
+      window.location.replace('/healthcare-login');
     }
   };
 
@@ -242,7 +270,7 @@ const HealthcareDashboard = () => {
         </button>
         <div className="healthcare-mobile-logo">
           <span className="healthcare-mobile-icon">🏥</span>
-          <span className="healthcare-mobile-title">CLICARE Healthcare</span>
+          <span className="healthcare-mobile-title">CliCare Healthcare</span>
         </div>
         <button className="healthcare-mobile-logout" onClick={handleLogout}>
           🚪
@@ -255,7 +283,7 @@ const HealthcareDashboard = () => {
           <div className="healthcare-sidebar-logo">
             <span className="healthcare-sidebar-icon">🏥</span>
             <div className="healthcare-sidebar-text">
-              <h1>CLICARE</h1>
+              <h1>CliCare</h1>
               <p>Healthcare Portal</p>
             </div>
           </div>

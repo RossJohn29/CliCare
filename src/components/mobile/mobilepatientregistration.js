@@ -376,7 +376,7 @@ const MobilePatientRegistration = () => {
             onChange={(e) => setTermsAccepted(e.target.checked)}
             required 
           />
-          <span>I agree to CLICARE's privacy policy and terms of service</span>
+          <span>I agree to CliCare's privacy policy and terms of service</span>
         </label>
       </div>
     </div>
@@ -461,14 +461,14 @@ const MobilePatientRegistration = () => {
     <div className="mobile-registration-portal">
       <div className="mobile-reg-header">
         <div className="mobile-reg-logo">🏥</div>
-        <h1>CLICARE</h1>
+        <h1>CliCare</h1>
         <p>New Patient Registration</p>
       </div>
 
       {renderProgressBar()}
       
       <div className="mobile-reg-content">
-        {error && <div className="mobile-reg-error">⚠️ {error}</div>}
+        {error && <div className="mobile-reg-error">{error}</div>}
         
         {currentStep === 1 && renderPersonalDetailsStep()}
         {currentStep === 2 && renderEmergencyContactStep()}

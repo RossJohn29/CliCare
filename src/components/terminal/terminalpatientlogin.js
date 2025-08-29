@@ -1,12 +1,12 @@
-// terminalpatientlogin.js - UPDATED to work with real backend API
+// terminalpatientlogin.js
 import React, { useState, useEffect } from 'react';
 import './terminalpatientlogin.css';
 
 const TerminalPatientLogin = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [patientType, setPatientType] = useState(''); // 'returning' or 'new'
-  const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone' 
-  const [formData, setFormData] = useState({
+  const [patientType, setPatientType] = useState('');
+  const [loginMethod, setLoginMethod] = useState('email');
+  const [credentials, setCredentials] = useState({
     patientId: '',
     email: '',
     phoneNumber: '',
@@ -20,7 +20,9 @@ const TerminalPatientLogin = () => {
   const [sendingCode, setSendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState('');
-  const [scanMode, setScanMode] = useState(''); // 'qr' or 'id'
+  const [scanMode, setScanMode] = useState('');
+  const [countdown, setCountdown] = useState(0);
+  const [justSent, setJustSent] = useState(false);
 
   // Update time every second
   useEffect(() => {
@@ -28,22 +30,34 @@ const TerminalPatientLogin = () => {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    let timer;
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
     setError('');
   };
 
-  // FIXED: Real OTP sending function (matches mobile login)
+  const handleMethodSwitch = (method) => {
+    setLoginMethod(method);
+    setCodeSent(false);
+    setJustSent(false);
+    setCredentials((prev) => ({ ...prev, otp: '' }));
+    setError('');
+  };
+
   const handleSendOTP = async () => {
-    if (!formData.patientId) {
-      setError('Please enter your Patient ID first');
+    if (!credentials.patientId) {
+      setError('Please enter your Patient ID');
       return;
     }
 
-    const contactValue = loginMethod === 'email' ? formData.email : formData.phoneNumber;
+    const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
     if (!contactValue) {
       setError(`Please enter your ${loginMethod === 'email' ? 'email address' : 'phone number'}`);
       return;
@@ -53,15 +67,12 @@ const TerminalPatientLogin = () => {
     setError('');
 
     try {
-      // FIXED: Use real backend API (same as mobile login)
       const response = await fetch('http://localhost:5000/api/outpatient/send-otp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          patientId: formData.patientId.toUpperCase(),
+          patientId: credentials.patientId.toUpperCase(),
           contactInfo: contactValue,
           contactType: loginMethod
         })
@@ -75,56 +86,53 @@ const TerminalPatientLogin = () => {
         return;
       }
 
-      // Success
       setCodeSent(true);
-      alert(`📱 Verification code sent successfully to your ${loginMethod}!`);
-
+      setJustSent(true);
+      
+      setTimeout(() => {
+        setJustSent(false);
+        setCountdown(120);
+      }, 2000);
     } catch (err) {
       console.error('Send OTP error:', err);
-      setError('Connection error. Please try again.');
+      setError('Connection error. Please check your internet and try again.');
     } finally {
       setSendingCode(false);
     }
   };
 
-  // FIXED: Real login function that connects to backend
-  const handleReturningPatientLogin = async () => {
+  const handleLogin = async () => {
     setLoading(true);
     setError('');
 
     try {
-      if (!formData.patientId) {
+      if (!credentials.patientId) {
         setError('Please enter your Patient ID');
         setLoading(false);
         return;
       }
-
       if (!codeSent) {
         setError('Please send verification code first');
         setLoading(false);
         return;
       }
-
-      if (!formData.otp) {
+      if (!credentials.otp) {
         setError('Please enter the verification code');
         setLoading(false);
         return;
       }
 
-      const contactValue = loginMethod === 'email' ? formData.email : formData.phoneNumber;
+      const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
 
-      // FIXED: Use real backend API with deviceType: 'terminal'
       const response = await fetch('http://localhost:5000/api/outpatient/verify-otp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          patientId: formData.patientId.toUpperCase(),
+          patientId: credentials.patientId.toUpperCase(),
           contactInfo: contactValue,
-          otp: formData.otp,
-          deviceType: 'terminal'  // KEY DIFFERENCE: terminal instead of mobile
+          otp: credentials.otp,
+          deviceType: 'terminal'
         })
       });
 
@@ -136,22 +144,15 @@ const TerminalPatientLogin = () => {
         return;
       }
 
-      // Store authentication data (same as mobile)
-      sessionStorage.setItem('patientToken', data.token);
-      sessionStorage.setItem('patientId', data.patient.patient_id);
-      sessionStorage.setItem('patientName', data.patient.name);
-      sessionStorage.setItem('patientInfo', JSON.stringify(data.patient));
-      
-       sessionStorage.setItem('patientType', 'returning');
-      sessionStorage.setItem('terminalPatientId', data.patient.patient_id);
-      sessionStorage.setItem('directToHealthAssessment', 'true'); // Flag for direct redirect
-      
-      alert('✅ Login successful! Redirecting to Health Assessment...');
+      localStorage.setItem('patientToken', data.token);
+      localStorage.setItem('patientId', data.patient.patient_id);
+      localStorage.setItem('patientName', data.patient.name);
+      localStorage.setItem('patientInfo', JSON.stringify(data.patient));
+      localStorage.setItem('patientType', 'returning');
+      localStorage.setItem('terminalPatientId', data.patient.patient_id);
+      localStorage.setItem('directToHealthAssessment', 'true');
 
-      
-      // CRITICAL: Redirect to Symptoms page instead of dashboard
       window.location.href = '/terminal-patient-registration';
-
     } catch (err) {
       console.error('Login error:', err);
       setError('Connection error. Please try again.');
@@ -160,12 +161,11 @@ const TerminalPatientLogin = () => {
     }
   };
 
-  // Keep existing QR scan functions (they can stay as mock for now)
+  // Terminal-specific QR scan functions
   const handleQRScan = () => {
     setScanMode('qr');
     setError('');
     
-    // Simulate QR code scanning
     setTimeout(() => {
       const mockQRData = {
         patientId: 'PAT123',
@@ -174,13 +174,13 @@ const TerminalPatientLogin = () => {
         contactNumber: '09171234567'
       };
       
-      setFormData({
-        ...formData,
+      setCredentials({
+        ...credentials,
         ...mockQRData,
         qrCode: 'QR_' + Date.now()
       });
       setScanMode('');
-      alert('✅ QR Code scanned successfully! Please verify your information.');
+      alert('QR Code scanned successfully! Please verify your information.');
     }, 2000);
   };
 
@@ -188,50 +188,30 @@ const TerminalPatientLogin = () => {
     setScanMode('id');
     setError('');
     
-    // Simulate ID OCR scanning
     setTimeout(() => {
       const mockIDData = {
         name: 'JUAN DELA CRUZ',
         birthday: '1990-03-22'
       };
       
-      setFormData({
-        ...formData,
+      setCredentials({
+        ...credentials,
         ...mockIDData
       });
       setScanMode('');
-      alert('📄 ID scanned successfully! Information auto-filled. Please complete remaining fields.');
+      alert('ID scanned successfully! Information auto-filled. Please complete remaining fields.');
     }, 3000);
   };
 
   const handleNewPatientRedirect = () => {
-    // Set new patient indicator and redirect to registration
-    sessionStorage.setItem('patientType', 'new');
-    sessionStorage.setItem('terminalPatientId', 'NEW_' + Date.now().toString().slice(-6));
-    sessionStorage.setItem('patientName', 'New Patient');
+    localStorage.setItem('patientType', 'new');
+    localStorage.setItem('terminalPatientId', 'NEW_' + Date.now().toString().slice(-6));
+    localStorage.setItem('patientName', 'New Patient');
     
-    alert('📋 Redirecting to new patient registration...');
     window.location.href = '/terminal-patient-registration';
   };
 
-  const resetForm = () => {
-    setPatientType('');
-    setFormData({
-      patientId: '',
-      email: '',
-      phoneNumber: '',
-      otp: '',
-      qrCode: '',
-      name: '',
-      birthday: '',
-      contactNumber: ''
-    });
-    setCodeSent(false);
-    setError('');
-    setScanMode('');
-  };
-
-  // Keep existing utility functions
+  // Utility functions
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -250,304 +230,230 @@ const TerminalPatientLogin = () => {
     });
   };
 
-  // Keep existing render functions but update the OTP input section
-  const renderReturningPatientForm = () => (
-    <div className="terminal-main-card">
+  /* Patient Type Selection */
+  const renderPatientTypeSelection = () => (
+    <div className="terminal-card">
       <div className="terminal-form-header">
-        <div className="terminal-back-btn-container">
-          <button onClick={resetForm} className="terminal-back-btn">
-            ← Back
-          </button>
-        </div>
-        
         <div className="terminal-patient-indicator">
-          <div className="terminal-indicator-icon">👤</div>
+          <span className="terminal-indicator">
+            <i className="fa-regular fa-hospital"></i>
+          </span>
         </div>
-        <h3>Returning Patient Login</h3>
-        <p>Access your existing patient record</p>
+        <h3>Welcome to CliCare</h3>
+        <p>Choose your access type below</p>
       </div>
 
-      {error && <div className="terminal-error">⚠️ {error}</div>}
+      <div className="terminal-patient-types">
+        <button onClick={() => setPatientType('old')} className="terminal-patient-btn">
+          <div className="icon"><i className="fa-solid fa-user"></i></div>
+          <div className="terminal-btn-content">
+            <h3>Returning Patient</h3>
+            <p>I have a Patient ID</p>
+            <small>Access your medical records and book appointments</small>
+          </div>
+        </button>
 
-      <div className="terminal-login-options">
+        <button onClick={() => setPatientType('new')} className="terminal-patient-btn">
+          <div className="icon"><i className="fa-solid fa-user-plus"></i></div>
+          <div className="terminal-btn-content">
+            <h3>New Patient</h3>
+            <p>First time here</p>
+            <small>Create your patient account in minutes</small>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+
+  /* Old Patient Login */
+  const renderOldPatientLogin = () => (
+    <div className="terminal-card">
+      <div className="terminal-form-header">
+        <div className="terminal-patient-indicator">
+          <span className="terminal-indicator">
+            <i className="fa-regular fa-user"></i>
+          </span>
+        </div>
+        <h3>Welcome Back!</h3>
+        <p>Enter your details to access your account</p>
+      </div>
+
+      {error && <div className="terminal-error">{error}</div>}
+
+      <div className="terminal-login-form">
         <div className="terminal-input-group">
-          <label>Patient ID *</label>
+          <label>Patient ID</label>
           <input
             type="text"
             name="patientId"
-            value={formData.patientId}
+            value={credentials.patientId}
             onChange={handleInputChange}
-            placeholder="ENTER PATIENT ID (E.G., PAT001)"
-            className="terminal-input"
-            style={{ textTransform: 'uppercase' }}
+            placeholder="Enter Patient ID (e.g., PAT001)"
+            className="terminal-form-input"
+            required
+            autoComplete="off"
+            spellCheck="false"
           />
-          <small>Found on your patient card or previous visit documents</small>
+          <small className="terminal-input-hint">
+            Found on your patient card or previous visit documents
+          </small>
         </div>
 
         <div className="terminal-input-group">
-          <label>Verification Method</label>
-          <div className="terminal-method-toggle">
+          <div className="terminal-method-selection">
+            <label>Verification Method</label>
+            <div className="terminal-method-toggle">
+              <button
+                type="button"
+                onClick={() => handleMethodSwitch('email')}
+                className={`terminal-method-btn ${loginMethod === 'email' ? 'active' : ''}`}
+              >
+                <i className="fa-solid fa-envelope"></i> Email
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMethodSwitch('phone')}
+                className={`terminal-method-btn ${loginMethod === 'phone' ? 'active' : ''}`}
+              >
+                <i className="fa-solid fa-phone"></i> SMS
+              </button>
+            </div>
+          </div>
+          
+          <label>{loginMethod === 'email' ? 'Email Address' : 'Phone Number'}</label>
+          <div className="terminal-contact-group">
+            <input
+              type={loginMethod === 'email' ? 'email' : 'tel'}
+              name={loginMethod === 'email' ? 'email' : 'phoneNumber'}
+              value={loginMethod === 'email' ? credentials.email : credentials.phoneNumber}
+              onChange={handleInputChange}
+              placeholder={loginMethod === 'email' ? 'you@example.com' : '09XX-XXX-XXXX'}
+              className="terminal-form-input"
+              required
+              autoComplete="off"
+            />
             <button
-              onClick={() => {
-                setLoginMethod('email');
-                setCodeSent(false);
-                setFormData(prev => ({ ...prev, otp: '' }));
-              }}
-              className={`terminal-method-btn ${loginMethod === 'email' ? 'active' : ''}`}
+              type="button"
+              onClick={handleSendOTP}
+              className="terminal-otp-send-btn"
+              disabled={sendingCode || justSent || countdown > 0}
             >
-              📧 Email
-            </button>
-            <button
-              onClick={() => {
-                setLoginMethod('phone');
-                setCodeSent(false);
-                setFormData(prev => ({ ...prev, otp: '' }));
-              }}
-              className={`terminal-method-btn ${loginMethod === 'phone' ? 'active' : ''}`}
-            >
-              📱 SMS
+              {sendingCode
+                ? (<><span className="terminal-loading-spinner"></span> Sending...</>)
+                : justSent
+                  ? 'Sent'
+                  : countdown > 0
+                    ? `Resend in ${countdown}s`
+                    : 'Send Code'}
             </button>
           </div>
+          <small className="terminal-input-hint">
+            We'll send a verification code to your registered {loginMethod}
+          </small>
         </div>
 
-        {/* UPDATED: Real contact info input with send button */}
-        {loginMethod === 'email' ? (
-          <div className="terminal-input-group">
-            <label>Email Address *</label>
-            <div className="terminal-contact-group">
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="your@email.com"
-                className="terminal-input"
-                disabled={codeSent}
-              />
-              <button
-                onClick={handleSendOTP}
-                disabled={sendingCode || !formData.email || codeSent || !formData.patientId}
-                className="terminal-send-btn"
-              >
-                {sendingCode ? (
-                  <>
-                    <span className="terminal-loading-spinner"></span>
-                    Sending...
-                  </>
-                ) : codeSent ? (
-                  '✓ Sent'
-                ) : (
-                  'Send Code'
-                )}
-              </button>
-            </div>
-            <small>We'll send a verification code to your registered email</small>
-          </div>
-        ) : (
-          <div className="terminal-input-group">
-            <label>Phone Number *</label>
-            <div className="terminal-contact-group">
-              <input
-                type="tel"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                placeholder="09XX-XXX-XXXX"
-                className="terminal-input"
-                disabled={codeSent}
-              />
-              <button
-                onClick={handleSendOTP}
-                disabled={sendingCode || !formData.phoneNumber || codeSent || !formData.patientId}
-                className="terminal-send-btn"
-              >
-                {sendingCode ? (
-                  <>
-                    <span className="terminal-loading-spinner"></span>
-                    Sending...
-                  </>
-                ) : codeSent ? (
-                  '✓ Sent'
-                ) : (
-                  'Send Code'
-                )}
-              </button>
-            </div>
-            <small>We'll send a verification code to your registered phone number</small>
-          </div>
-        )}
-
-        {/* UPDATED: OTP verification input */}
         <div className="terminal-input-group">
-          <label>Verification Code *</label>
+          <label>Verification Code</label>
           <input
             type="text"
             name="otp"
-            value={formData.otp}
+            value={credentials.otp}
             onChange={handleInputChange}
             placeholder="Enter 6-digit verification code"
-            className="terminal-input"
+            className="terminal-form-input"
             maxLength="6"
-            disabled={!codeSent}
+            disabled={sendingCode}
+            required
           />
-          <small>
-            {codeSent 
-              ? `Code sent to your ${loginMethod}. Please check and enter the 6-digit code.`
-              : 'Please send verification code first'
+          <small className="terminal-input-hint">
+            {codeSent
+              ? (<><i className="fa-solid fa-square-check"></i> Code sent to your {loginMethod}</>)
+              : (<><i className="fa-solid fa-triangle-exclamation"></i> Please send verification code first</>)
             }
           </small>
         </div>
-      </div>
 
-      <button
-        onClick={handleReturningPatientLogin}
-        disabled={loading || !formData.patientId || !formData.otp || !codeSent}
-        className="terminal-action-btn primary large"
-      >
-        {loading ? (
-          <>
-            <span className="terminal-loading-spinner"></span>
-            Verifying...
-          </>
-        ) : (
-          '🏥 Access Patient Record'
-        )}
-      </button>
-    </div>
-  );
+        <button type="button" onClick={handleLogin} className="terminal-access-btn">
+          Sign In
+        </button>
 
-  // Keep all other existing render functions unchanged...
-  const renderPatientTypeSelection = () => (
-    <div className="terminal-main-card">
-      <div className="terminal-welcome">
-        <h2>Welcome to CLICARE</h2>
-        <p>Hospital Digital Registration System</p>
-        <div className="terminal-time-display">
-          <div className="terminal-time">{formatTime(currentTime)}</div>
-          <div className="terminal-date">{formatDate(currentTime)}</div>
+        <div className="terminal-account-toggle">
+          <p>
+            Don't have an account?{' '}
+            <button onClick={() => setPatientType('new')} className="terminal-account-link">
+              Register here
+            </button>
+          </p>
         </div>
       </div>
-      
-      <div className="terminal-patient-types">
-        <button 
-          onClick={() => setPatientType('returning')}
-          className="terminal-patient-btn"
-        >
-          <div className="terminal-btn-icon">👤</div>
-          <div className="terminal-btn-content">
-            <h3>Returning Patient</h3>
-            <p>I have visited this hospital before</p>
-            <small>Use your Patient ID or scan QR code from mobile app</small>
-          </div>
-          <div className="terminal-btn-arrow">→</div>
-        </button>
-        
-        <button 
-          onClick={() => setPatientType('new')}
-          className="terminal-patient-btn"
-        >
-          <div className="terminal-btn-icon">✨</div>
-          <div className="terminal-btn-content">
-            <h3>New Patient</h3>
-            <p>First time visiting this hospital</p>
-            <small>Create your patient record and proceed to registration</small>
-          </div>
-          <div className="terminal-btn-arrow">→</div>
-        </button>
-      </div>
-
-      <div className="terminal-help-footer">
-        <p>🆘 Need assistance? Press the help button or ask hospital staff</p>
-      </div>
     </div>
   );
 
+  /* New Patient Registration */
   const renderNewPatientRedirect = () => (
-    <div className="terminal-main-card">
+    <div className="terminal-card">
       <div className="terminal-form-header">
-        <div className="terminal-back-btn-container">
-          <button onClick={resetForm} className="terminal-back-btn">
-            ← Back
-          </button>
-        </div>
-        
         <div className="terminal-patient-indicator">
-          <div className="terminal-indicator-icon">✨</div>
+          <span className="terminal-indicator">
+            <i className="fa-solid fa-user-plus"></i>
+          </span>
         </div>
-        <h3>New Patient Registration</h3>
-        <p>Create your patient record with CLICARE</p>
+        <h3>Create Your Account</h3>
+        <p>Join CliCare for better healthcare management</p>
       </div>
 
       <div className="terminal-reg-info">
         <div className="terminal-info-card">
-          <h4>📋 Registration Process:</h4>
-          <div className="terminal-feature-list">
-            <div className="terminal-feature-item">
-              <span className="terminal-feature-icon">👤</span>
-              <span>Personal information and contact details</span>
-            </div>
-            <div className="terminal-feature-item">
-              <span className="terminal-feature-icon">🆔</span>
-              <span>Optional ID scan for faster setup</span>
-            </div>
-            <div className="terminal-feature-item">
-              <span className="terminal-feature-icon">✅</span>
-              <span>Review and confirm your information</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="terminal-time-estimate">
-          <div className="terminal-estimate-icon">⏱️</div>
-          <div className="terminal-estimate-content">
-            <strong>Quick & Easy</strong>
-            <p>Takes only 3-5 minutes to complete</p>
-          </div>
+          <h4>Quick Registration Process:</h4>
+          <ul className="terminal-info-list">
+            <li><i className="fa-solid fa-check"></i> Personal information (name, age, contact)</li>
+            <li><i className="fa-solid fa-check"></i> Emergency contact details</li>
+            <li><i className="fa-solid fa-check"></i> Optional ID scan for faster setup</li>
+            <li><i className="fa-solid fa-check"></i> Review and confirm your details</li>
+          </ul>
         </div>
       </div>
 
-      <button 
+      <button
         onClick={handleNewPatientRedirect}
-        className="terminal-action-btn primary large"
+        className="terminal-access-btn"
       >
-        🚀 Start Registration Process
+        Start Registration
       </button>
+
+      <div className="terminal-account-toggle">
+        <p>
+          Already have an account?{' '}
+          <button onClick={() => setPatientType('old')} className="terminal-account-link">
+            Sign in
+          </button>
+        </p>
+      </div>
     </div>
   );
 
   return (
-    <div className="terminal-portal">
+    <div className="terminal-patient-portal">
       <div className="terminal-header">
         <div className="terminal-logo">🏥</div>
         <div className="terminal-title">
-          <h1>CLICARE</h1>
+          <h1>CliCare</h1>
           <p>Digital Patient Management</p>
         </div>
         <div className="terminal-hospital-info">
-          <p><strong>Terminal Station</strong></p>
-          <p>Main Lobby Registration</p>
+          <p><strong>Mobile Portal</strong></p>
+          <p>Patient Access</p>
         </div>
       </div>
       
       <div className="terminal-content">
         {!patientType && renderPatientTypeSelection()}
-        {patientType === 'returning' && renderReturningPatientForm()}
+        {patientType === 'old' && renderOldPatientLogin()}
         {patientType === 'new' && renderNewPatientRedirect()}
       </div>
 
       <div className="terminal-footer">
-        <div className="terminal-footer-section">
-          <h4>🆘 Need Help?</h4>
-          <p>Press help button or ask staff</p>
-        </div>
-        <div className="terminal-footer-section">
-          <h4>📞 Emergency</h4>
-          <p>Call extension 911</p>
-        </div>
-        <div className="terminal-footer-section">
-          <h4>ℹ️ Information</h4>
-          <p>Reception desk available</p>
-        </div>
+        <p>Secure patient access • Need help? Tap to call (02) 8123-4567</p>
       </div>
     </div>
   );

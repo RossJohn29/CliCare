@@ -57,7 +57,7 @@
 
 .admin-mobile-title {
   font-size: 1.1em;
-  font-weight: 700;
+  font-weight: 600;
   color: #1557b0;
 }
 
@@ -329,7 +329,7 @@
   color: #202124;
   font-size: 2em;
   margin: 0 0 8px 0;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .admin-page-header p {
@@ -413,7 +413,7 @@
 .admin-stat-number {
   color: #202124;
   font-size: 2.2em;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 4px;
   line-height: 1;
 }

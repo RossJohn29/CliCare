@@ -1,4 +1,4 @@
-// App.js - CLICARE Application with Updated Routing - Mobile Dashboard Integration
+// App.js
 import React from 'react';
 import './App.css';
 
@@ -22,7 +22,6 @@ import TerminalPatientRegistration from './components/terminal/terminalpatientre
 
 import { supabase } from './supabase';
 
-// Simple Router Implementation (without react-router-dom)
 const App = () => {
   const [currentRoute, setCurrentRoute] = React.useState(
     window.location.pathname || '/'
@@ -42,9 +41,20 @@ const App = () => {
     setCurrentRoute(path);
   };
 
-  // Test Supabase connection
+  // Auth Protection Helper
+  const requireAuth = (tokenKey, infoKey, loginPath) => {
+    const token = localStorage.getItem(tokenKey);
+    const info = localStorage.getItem(infoKey);
+    
+    if (!token || !info) {
+      localStorage.clear();
+      window.location.replace(loginPath);
+      return false;
+    }
+    return true;
+  };
+
   const testSupabaseConnection = async () => {
-    console.log('Testing Supabase connection...');
     try {
       const { data, error } = await supabase.from('outPatient').select('count');
       if (error) {
@@ -57,7 +67,6 @@ const App = () => {
     }
   };
 
-  // Landing Page Component
   const LandingPage = () => {
     return (
       <div style={{
@@ -80,7 +89,6 @@ const App = () => {
           boxShadow: '0 15px 40px rgba(0, 0, 0, 0.12)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
-          {/* Hospital Branding */}
           <div style={{
             width: '60px',
             height: '60px',
@@ -91,7 +99,7 @@ const App = () => {
             justifyContent: 'center',
             color: 'white',
             fontSize: '1.8em',
-            fontWeight: '700',
+            fontWeight: '600',
             margin: '0 auto 15px auto',
             boxShadow: '0 6px 20px rgba(66, 133, 244, 0.25)'
           }}>
@@ -105,7 +113,7 @@ const App = () => {
             fontWeight: '800',
             letterSpacing: '-0.5px'
           }}>
-            CLICARE
+            CliCare
           </h1>
           
           <p style={{
@@ -125,7 +133,6 @@ const App = () => {
             Pamantasan ng Lungsod ng Maynila
           </p>
 
-          {/* Patient Access Section */}
           <div style={{ marginBottom: '25px' }}>
             <h2 style={{
               color: '#202124',
@@ -136,7 +143,6 @@ const App = () => {
               Patient Access Portal
             </h2>
             
-            {/* Single Patient Button */}
             <button
               onClick={() => navigate('/mobile-patient-login')}
               style={{
@@ -216,7 +222,6 @@ const App = () => {
             </button>
           </div>
 
-          {/* Staff Access Section */}
           <div style={{
             background: 'linear-gradient(145deg, #f8f9fa 0%, #f1f3f4 100%)',
             borderRadius: '12px',
@@ -323,7 +328,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* Temporary Supabase Test Button */}
           <button
             onClick={testSupabaseConnection}
             style={{
@@ -342,8 +346,6 @@ const App = () => {
             🔗 Test Supabase Connection
           </button>
 
-
-          {/* Footer */}
           <div style={{
             marginTop: '25px',
             paddingTop: '20px',
@@ -363,7 +365,6 @@ const App = () => {
     );
   };
 
-  // Not Found Component
   const NotFound = () => {
     return (
       <div style={{
@@ -437,41 +438,39 @@ const App = () => {
     );
   };
 
-  // Route rendering logic
   const renderCurrentRoute = () => {
     switch (currentRoute) {
       case '/':
         return <LandingPage />;
       
-      // Mobile Patient Routes
       case '/mobile-patient-login':
         return <MobilePatientLogin />;
       case '/mobile-patient-register':
         return <MobilePatientRegistration />;
       case '/mobile-patient-dashboard':
+        if (!requireAuth('patientToken', 'patientId', '/mobile-patient-login')) return null;
         return <MobilePatientDashboard />;
       case '/mobile-health-assessment':
         return <MobileHealthAssessment />;
       
-      // Admin Routes
       case '/admin-login':
         return <AdminLogin />;
       case '/admin-dashboard':
+        if (!requireAuth('adminToken', 'adminInfo', '/admin-login')) return null;
         return <AdminDashboard />;
       
-      // Healthcare Routes (Doctor Only)
       case '/healthcare-login':
         return <HealthcareLogin />;
       case '/healthcare-dashboard':
+        if (!requireAuth('healthcareToken', 'staffInfo', '/healthcare-login')) return null;
         return <HealthcareDashboard />;
-      
-      // Terminal Routes
+
       case '/terminal-patient-login':
         return <TerminalPatientLogin />;
       case '/terminal-patient-registration':
         return <TerminalPatientRegistration />;
       
-      // Legacy redirects for backward compatibility
+      // Legacy redirects
       case '/patient-login':
         navigate('/mobile-patient-login');
         return <MobilePatientLogin />;
@@ -479,7 +478,6 @@ const App = () => {
         navigate('/mobile-patient-register');
         return <MobilePatientRegistration />;
       case '/terminal-kiosk':
-        // Redirect old terminal-kiosk route to terminal-patient-login
         navigate('/terminal-patient-login');
         return <TerminalPatientLogin />;
       

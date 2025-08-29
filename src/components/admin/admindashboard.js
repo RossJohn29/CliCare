@@ -7,6 +7,7 @@ const AdminDashboard = () => {
   const [currentPage, setCurrentPage] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  
   const [adminInfo, setAdminInfo] = useState({
     name: 'Loading...',
     role: 'Loading...',
@@ -30,50 +31,29 @@ const AdminDashboard = () => {
   });
   const [error, setError] = useState('');
 
-  // Authentication check and data loading
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
-        // Check authentication
+        // Authentication check
         if (!adminUtils.isAuthenticated()) {
-          window.location.href = '/admin-login';
+          localStorage.clear();
+          window.location.replace('/admin-login');
           return;
         }
 
-        // Validate token
-        await adminApi.validateToken();
-
-        // Load admin info from storage first (for immediate display)
+        // Load admin info from localStorage
         const storedAdminInfo = adminUtils.getAdminInfo();
         if (storedAdminInfo) {
           setAdminInfo({
             name: adminUtils.formatAdminName(storedAdminInfo),
             role: adminUtils.formatAdminPosition(storedAdminInfo),
-            adminId: storedAdminInfo.healthadmin_id || storedAdminInfo.healthadminid
+            adminId: storedAdminInfo.healthadmin_id || storedAdminInfo.healthadminid || 'Unknown ID'
           });
-        }
-
-        // Load fresh admin profile and dashboard data
-        const [profileResponse, dashboardResponse] = await Promise.all([
-          adminApi.getProfile(),
-          adminApi.getDashboardStats()
-        ]);
-
-        // Update admin info with fresh data
-        if (profileResponse.success && profileResponse.admin) {
+        } else {
           setAdminInfo({
-            name: adminUtils.formatAdminName(profileResponse.admin),
-            role: adminUtils.formatAdminPosition(profileResponse.admin),
-            adminId: profileResponse.admin.healthadmin_id || profileResponse.admin.healthadminid
-          });
-        }
-
-        // Update dashboard data
-        if (dashboardResponse.success) {
-          setDashboardData({
-            stats: dashboardResponse.stats || dashboardData.stats,
-            recentActivities: dashboardResponse.recentActivities || [],
-            systemStatus: dashboardResponse.systemStatus || dashboardData.systemStatus
+            name: 'Admin User',
+            role: 'Administrator',
+            adminId: localStorage.getItem('adminId') || 'Unknown ID'
           });
         }
 
@@ -81,53 +61,27 @@ const AdminDashboard = () => {
 
       } catch (error) {
         console.error('Dashboard initialization error:', error);
-        setError(adminUtils.formatErrorMessage(error));
+        setError('Failed to initialize dashboard');
         setLoading(false);
-        
-        // If authentication error, redirect to login
-        if (error.message?.includes('Unauthorized') || error.message?.includes('Invalid token')) {
-          setTimeout(() => {
-            window.location.href = '/admin-login';
-          }, 2000);
-        }
       }
     };
 
     initializeDashboard();
   }, []);
 
-  // Auto-refresh dashboard data every 30 seconds
-  useEffect(() => {
-    const refreshInterval = setInterval(async () => {
-      try {
-        const response = await adminApi.getDashboardStats();
-        if (response.success) {
-          setDashboardData(prev => ({
-            stats: response.stats || prev.stats,
-            recentActivities: response.recentActivities || prev.recentActivities,
-            systemStatus: response.systemStatus || prev.systemStatus
-          }));
-        }
-      } catch (error) {
-        console.warn('Auto-refresh failed:', error);
-      }
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(refreshInterval);
-  }, []);
-
-  // Handle logout
   const handleLogout = async () => {
     try {
       setLoading(true);
-      await adminApi.logout();
+      // Optional: Call logout API when you implement it
+      // await adminApi.logout();
     } catch (error) {
       console.warn('Logout error:', error);
     } finally {
-      window.location.href = '/admin-login';
+      localStorage.clear();
+      window.location.replace('/admin-login');
     }
   };
-
+  
   const menuItems = [
     { id: 'overview', icon: '📊', label: 'Dashboard Overview', description: 'System statistics and analytics' },
     { id: 'analytics', icon: '📈', label: 'Health Analytics', description: 'AI-generated health reports' },
@@ -333,7 +287,7 @@ const AdminDashboard = () => {
           <div className="admin-sidebar-logo">
             <span className="admin-sidebar-icon">🏥</span>
             <div className="admin-sidebar-text">
-              <h1>CLICARE</h1>
+              <h1>CliCare</h1>
               <p>Admin Portal</p>
             </div>
           </div>

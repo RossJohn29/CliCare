@@ -1,5 +1,5 @@
-/* App.css - Main Application Styles */
-
+/* App.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 * {
   margin: 0;
   padding: 0;
@@ -7,9 +7,7 @@
 }
 
 body {
-  font-family: 'Poppins, sans-serif';
-  background: #f8fafc;
-  color: #1f2937;
+  font-family: 'Poppins', sans-serif;
 }
 
 .App {
@@ -374,7 +372,6 @@ body {
 
 .terminal-content p {
   font-size: 1.1em;
-  margin-bottom: 30px;
   opacity: 0.8;
 }
 

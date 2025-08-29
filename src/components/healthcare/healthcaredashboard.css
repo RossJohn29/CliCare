@@ -57,7 +57,7 @@
 
 .healthcare-mobile-title {
   font-size: 1.1em;
-  font-weight: 700;
+  font-weight: 600;
   color: #1557b0;
 }
 
@@ -336,7 +336,7 @@
   color: #202124;
   font-size: 2em;
   margin: 0 0 8px 0;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .healthcare-page-header p {
@@ -379,7 +379,7 @@
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
   margin-bottom: 30px;
-  max-width: 700px;
+  max-width: 600px;
 }
 
 .healthcare-stat-card {
@@ -421,7 +421,7 @@
 .healthcare-stat-number {
   color: #202124;
   font-size: 2.2em;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 4px;
   line-height: 1;
 }

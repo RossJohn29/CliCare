@@ -1,12 +1,12 @@
-/* mobilepatientlogin.css - FIXED WIDTH to match Terminal design */
+/* mobilepatientlogin.css */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import '@fortawesome/fontawesome-free/css/all.css';
 
 .mobile-patient-portal {
   min-height: 100vh;
   background: linear-gradient(135deg, #4285f4 0%, #1a73e8 50%, #1557b0 100%);
   font-family: 'Poppins', sans-serif;
   position: relative;
-  padding: 0;
   display: flex;
   flex-direction: column;
 }
@@ -14,15 +14,11 @@
 .mobile-patient-portal::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="mobile-dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="0.8" fill="rgba(255,255,255,0.06)"/></pattern></defs><rect width="100" height="100" fill="url(%23mobile-dots)"/></svg>');
   pointer-events: none;
 }
 
-/* UPDATED: Mobile Header - matches Terminal header */
 .mobile-header {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(15px);
@@ -46,11 +42,10 @@
   justify-content: center;
   color: white;
   font-size: 1.3em;
-  font-weight: 700;
+  font-weight: 600;
   box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
 }
 
-/* UPDATED: Mobile title - centered like Terminal */
 .mobile-title {
   flex: 1;
   text-align: center;
@@ -71,7 +66,6 @@
   font-weight: 500;
 }
 
-/* Add hospital info section like Terminal */
 .mobile-hospital-info {
   text-align: right;
   color: #5f6368;
@@ -88,7 +82,6 @@
   font-weight: 600;
 }
 
-/* UPDATED: Mobile Content Container - matches Terminal centering and width */
 .mobile-content {
   flex: 1;
   padding: 20px;
@@ -99,20 +92,18 @@
   justify-content: center;
 }
 
-/* UPDATED: Mobile Card - matches Terminal width and sizing */
 .mobile-card {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
   border-radius: 20px;
-  padding: 25px 20px;
+  padding: 40px 35px;
   width: 100%;
-  max-width: 500px; /* CRITICAL: Same max-width as Terminal */
+  max-width: 500px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.3);
   position: relative;
 }
 
-/* Welcome Section */
 .mobile-welcome {
   text-align: center;
   margin-bottom: 25px;
@@ -132,164 +123,119 @@
   font-weight: 500;
 }
 
-/* Patient Type Selection */
 .mobile-patient-types {
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  margin-bottom: 25px;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .mobile-patient-btn {
-  background: #ffffff;
-  border: 2px solid #e8eaed;
-  border-radius: 16px;
-  padding: 18px 15px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
   text-align: left;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  min-height: 80px;
-}
-
-.mobile-patient-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(66, 133, 244, 0.08), transparent);
-  transition: left 0.5s;
+  font-family: 'Poppins', sans-serif;
 }
 
-.mobile-patient-btn:hover::before,
-.mobile-patient-btn:active::before {
-  left: 100%;
-}
-
-.mobile-patient-btn:hover,
-.mobile-patient-btn:active {
+.mobile-patient-btn:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-  border-color: #4285f4;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .mobile-patient-btn .icon {
-  font-size: 2em;
-  margin-right: 15px;
-  flex-shrink: 0;
-  background: linear-gradient(145deg, #e8f0fe, #d2e3fc);
-  padding: 10px;
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
+  border-radius: 100%;
+  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.mobile-btn-content {
-  flex-grow: 1;
-}
-
-.mobile-btn-content h3 {
-  margin: 0 0 5px 0;
-  color: #202124;
-  font-size: 1.1em;
-  font-weight: 600;
-}
-
-.mobile-btn-content p {
   color: #4285f4;
-  margin: 0 0 5px 0;
-  font-size: 0.9em;
-  font-weight: 600;
-}
-
-.mobile-btn-content small {
-  color: #5f6368;
-  font-size: 0.8em;
-  line-height: 1.3;
-  display: block;
-  font-weight: 400;
-}
-
-.mobile-arrow {
-  font-size: 1.2em;
-  color: #dadce0;
-  margin-left: 10px;
-  transition: all 0.3s ease;
+  font-size: 20px;
   flex-shrink: 0;
 }
 
-.mobile-patient-btn:hover .mobile-arrow,
-.mobile-patient-btn:active .mobile-arrow {
-  color: #4285f4;
-  transform: translateX(5px);
+.mobile-btn-content {
+  flex: 1;
+  margin: 0 16px;
 }
 
-/* UPDATED: Form Header - matches Terminal */
+.mobile-btn-content h3 {
+  margin: 0 0 1px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.mobile-btn-content p {
+  font-size: 13px;
+  color: #4285f4;
+  font-weight: 500;
+}
+
+.mobile-btn-content small {
+  font-size: 11px;
+  color: #1f2937;
+  line-height: 1;
+}
+
+.mobile-arrow {
+  font-size: 20px;
+  color: #6b7280;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.mobile-patient-btn:hover .mobile-arrow {
+  color: #3b82f6;
+  transform: translateX(4px);
+}
+
 .mobile-form-header {
   text-align: center;
   margin-bottom: 25px;
   position: relative;
 }
 
-.mobile-back-btn-container {
-  position: absolute;
-  left: 0;
-  top: 0;
-}
-
-.mobile-back-btn {
-  background: #f8f9fa;
-  border: 2px solid #dadce0;
-  padding: 8px 15px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 0.9em;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  color: #5f6368;
-  font-family: 'Poppins', sans-serif;
-}
-
-.mobile-back-btn:hover {
-  background: #f1f3f4;
-  border-color: #80868b;
-  color: #202124;
-}
-
-/* UPDATED: Patient indicator - matches Terminal */
 .mobile-patient-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .mobile-indicator {
-  font-size: 2.5em;
-  padding: 15px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
-  border: 2px solid #4285f4;
+  border: 3px solid #4285f4;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 70px;
-  height: 70px;
+  font-size: 24px;
+}
+
+.mobile-indicator .fa-regular.fa-user, 
+.mobile-indicator .fa-regular.fa-hospital, 
+.mobile-indicator .fa-solid.fa-user-plus { 
+  color: #4285f4; 
 }
 
 .mobile-form-header h3 {
   color: #202124;
-  font-size: 1.4em;
-  margin: 0 0 8px 0;
+  font-size: 1.6em;
+  margin: 0 0 5px 0;
   font-weight: 600;
 }
 
@@ -300,7 +246,6 @@
   font-weight: 400;
 }
 
-/* Login Form */
 .mobile-login-form {
   text-align: left;
 }
@@ -324,7 +269,6 @@
   border-radius: 12px;
   font-size: 16px;
   transition: all 0.3s ease;
-  box-sizing: border-box;
   background: #ffffff;
   font-family: 'Poppins', sans-serif;
   font-weight: 400;
@@ -343,12 +287,6 @@
   border-color: #e8eaed;
 }
 
-.mobile-patient-id-input {
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
-
 .mobile-input-hint {
   display: block;
   color: #5f6368;
@@ -357,7 +295,14 @@
   font-weight: 400;
 }
 
-/* UPDATED: Contact Method Toggle - matches Terminal exactly */
+.mobile-input-hint .fa-solid.fa-square-check { 
+  color: #28a745; 
+} 
+
+.mobile-input-hint .fa-solid.fa-triangle-exclamation { 
+  color: #FFC107; 
+}
+
 .mobile-method-selection {
   margin-bottom: 20px;
 }
@@ -379,7 +324,6 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  transition: all 0.3s ease;
   background: transparent;
   color: #5f6368;
   font-family: 'Poppins', sans-serif;
@@ -391,7 +335,11 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
-/* UPDATED: Contact Group with Send Button - matches Terminal layout */
+.mobile-method-btn .fa-solid.fa-envelope,
+.mobile-method-btn .fa-solid.fa-phone {
+  margin-right: 5px; ;
+}
+
 .mobile-contact-group {
   display: flex;
   gap: 10px;
@@ -402,9 +350,8 @@
   flex: 1;
 }
 
-/* UPDATED: Send Button - matches Terminal exactly */
 .mobile-send-btn {
-  background: linear-gradient(145deg, #34a853 0%, #137333 100%);
+  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
   color: white;
   border: none;
   padding: 14px 18px;
@@ -412,9 +359,7 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  transition: all 0.3s ease;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(52, 168, 83, 0.3);
   font-family: 'Poppins', sans-serif;
   min-width: 100px;
   display: flex;
@@ -423,19 +368,6 @@
   gap: 5px;
 }
 
-.mobile-send-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(52, 168, 83, 0.4);
-}
-
-.mobile-send-btn:disabled {
-  background: #9aa0a6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Registration Info */
 .mobile-reg-info {
   margin: 25px 0;
 }
@@ -464,19 +396,14 @@
 .mobile-info-list li {
   color: #202124;
   margin: 8px 0;
-  padding-left: 20px;
-  position: relative;
   line-height: 1.4;
   font-size: 0.85em;
   font-weight: 400;
 }
 
-.mobile-info-list li::before {
-  content: '✓';
-  position: absolute;
-  left: 0;
-  color: #34a853;
-  font-weight: 700;
+.mobile-info-list i { 
+  color: #28a745; 
+  margin-right: 10px; 
 }
 
 .mobile-time-estimate {
@@ -494,53 +421,49 @@
   font-size: 0.85em;
 }
 
-/* UPDATED: Action Buttons - matches Terminal exactly */
-.mobile-action-btn {
-  width: 100%;
-  padding: 16px;
+.mobile-access-btn,
+.mobile-otp-send-btn {
+  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
+  color: white;
   border: none;
-  border-radius: 14px;
-  font-size: 15px;
-  font-weight: 700;
+  border-radius: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: 'Poppins', sans-serif;
+  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 55px;
+  gap: 5px;
 }
 
-.mobile-action-btn.primary {
-  background: linear-gradient(145deg, #34a853 0%, #137333 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(52, 168, 83, 0.3);
+.mobile-access-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 15px;
+  margin-bottom: 25px;
 }
 
-.mobile-action-btn.primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(52, 168, 83, 0.4);
+.mobile-otp-send-btn {
+  padding: 14px 18px;
+  font-size: 13px;
+  flex-shrink: 0;
+  min-width: 100px;
 }
 
-/* Default blue button for other actions */
-.mobile-action-btn:not(.primary) {
-  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
-}
-
-.mobile-action-btn:not(.primary):hover:not(:disabled) {
+.mobile-access-btn:hover:not(:disabled),
+.mobile-otp-send-btn:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
 }
 
-.mobile-action-btn:disabled {
-  background: #9aa0a6;
+.mobile-access-btn:disabled,
+.mobile-otp-send-btn:disabled {
+  background: #a6c4fa;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
-  color: white;
 }
 
 .mobile-secondary-btn {
@@ -551,37 +474,42 @@
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s ease;
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
 }
 
-.mobile-secondary-btn:hover,
-.mobile-secondary-btn:active {
+.mobile-secondary-btn:hover {
   background: #4285f4;
   color: white;
 }
 
-/* UPDATED: Back Button - matches Terminal style */
-.mobile-back-btn-main {
-  background: #f8f9fa;
-  border: 2px solid #dadce0;
-  padding: 8px 15px;
-  border-radius: 10px;
+.mobile-account-toggle {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.mobile-account-toggle p {
+  color: #5f6368;
+  font-size: 0.9em;
+  margin-bottom: 0;
+}
+
+.mobile-account-link {
+  background: none;
+  border: none;
+  color: #4285f4;
   cursor: pointer;
   font-size: 0.9em;
   font-weight: 600;
-  transition: all 0.3s ease;
-  color: #5f6368;
+  text-decoration: underline;
   font-family: 'Poppins', sans-serif;
 }
 
-.mobile-back-btn-main:hover,
-.mobile-back-btn-main:active {
-  background: #e8f0fe;
+.mobile-account-link:hover {
+  text-decoration: none;
+  color: #1a73e8;
 }
 
-/* Error Message */
 .mobile-error {
   background: linear-gradient(145deg, #fce8e6 0%, #fad2cf 100%);
   color: #d93025;
@@ -595,7 +523,6 @@
   font-size: 0.9em;
 }
 
-/* UPDATED: Footer - matches Terminal footer */
 .mobile-footer {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(15px);
@@ -613,31 +540,13 @@
   font-weight: 400;
 }
 
-/* Loading Spinner */
-.mobile-loading-spinner {
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* UPDATED: Responsive Design - maintains Terminal-like proportions */
 @media (max-width: 768px) {
   .mobile-content {
     padding: 15px;
   }
-  
   .mobile-card {
-    max-width: 90%; /* Still constrains width on mobile */
-    padding: 20px 15px;
+    max-width: 90%;
+    padding: 35px 30px;
   }
 }
 
@@ -645,46 +554,41 @@
   .mobile-header {
     padding: 12px 15px;
   }
-  
   .mobile-logo {
     width: 45px;
     height: 45px;
     font-size: 1.2em;
   }
-  
   .mobile-title h1 {
     font-size: 1.6em;
   }
-  
   .mobile-content {
     padding: 10px;
   }
-  
   .mobile-card {
     max-width: 95%;
-    padding: 20px 15px;
+    padding: 30px 25px;
     border-radius: 16px;
   }
-  
   .mobile-patient-btn {
     padding: 15px 12px;
     min-height: 70px;
   }
-  
   .mobile-patient-btn .icon {
     width: 45px;
     height: 45px;
     font-size: 1.8em;
     margin-right: 12px;
   }
-  
   .mobile-contact-group {
-    flex-direction: column;
-    gap: 12px;
+    flex-direction: row;
+    gap: 8px;
+    align-items: stretch;
   }
-  
-  .mobile-send-btn {
-    width: 100%;
-    min-width: auto;
+  .mobile-otp-send-btn {
+    width: 110px;
+    min-width: 110px;
+    font-size: 12px;
+    padding: 12px 8px;
   }
 }

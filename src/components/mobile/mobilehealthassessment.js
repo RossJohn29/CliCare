@@ -1,4 +1,4 @@
-// mobilehealthassessment.js - CLICARE Mobile Health Assessment Component
+// mobilehealthassessment.js
 import React, { useState, useEffect } from 'react';
 import './mobilehealthassessment.css';
 
@@ -642,7 +642,7 @@ const removeAllergyDropdown = (index) => {
       <div className="assessment-header">
         <div className="assessment-logo">🏥</div>
         <div className="assessment-title">
-          <h1>CLICARE</h1>
+          <h1>CliCare</h1>
           <p>Health Assessment</p>
         </div>
         <button 
@@ -660,7 +660,7 @@ const removeAllergyDropdown = (index) => {
           <p>Patient: <strong>{patientInfo.name}</strong> | ID: <strong>{patientInfo.patientId}</strong></p>
         </div>
 
-        {error && <div className="assessment-error">⚠️ {error}</div>}
+        {error && <div className="assessment-error">{error}</div>}
         
         {renderCurrentStep()}
       </div>
