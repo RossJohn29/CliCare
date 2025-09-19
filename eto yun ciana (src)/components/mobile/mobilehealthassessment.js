@@ -1,0 +1,846 @@
+// mobilehealthassessment.js - Aligned with Terminal Design
+import React, { useState, useEffect } from 'react';
+import './mobilehealthassessment.css';
+
+const MobileHealthAssessment = () => {
+  const [currentStep, setCurrentStep] = useState(1); // 1: Symptoms, 2: Details, 3: Urgency, 4: Summary
+  const [formData, setFormData] = useState({
+    symptoms: [],
+    duration: '',
+    severity: '',
+    previousTreatment: '',
+    allergies: '',
+    medications: '',
+    preferredDate: '',
+    preferredTime: '',
+    urgencyLevel: 'normal'
+  });
+  const [loading, setLoading] = useState(false);
+  const [selectedAllergies, setSelectedAllergies] = useState(['']);
+  const [error, setError] = useState('');
+  const [patientInfo, setPatientInfo] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showValidation, setShowValidation] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    // Load patient info from session
+    const patientId = sessionStorage.getItem('patientId') || 'PAT001';
+    const patientName = sessionStorage.getItem('patientName') || 'Patient User';
+    
+    setPatientInfo({
+      patientId: patientId,
+      name: patientName
+    });
+
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const symptomCategories = [
+    {
+      category: 'General',
+      symptoms: ['Fever', 'Headache', 'Fatigue', 'Weight Loss', 'Weight Gain', 'Loss of Appetite']
+    },
+    {
+      category: 'Respiratory',
+      symptoms: ['Cough', 'Shortness of Breath', 'Chest Pain', 'Sore Throat', 'Runny Nose', 'Congestion']
+    },
+    {
+      category: 'Cardiovascular',
+      symptoms: ['Chest Discomfort', 'Heart Palpitations', 'Dizziness', 'Swelling in Legs', 'High Blood Pressure']
+    },
+    {
+      category: 'Gastrointestinal',
+      symptoms: ['Nausea', 'Vomiting', 'Diarrhea', 'Constipation', 'Abdominal Pain', 'Heartburn']
+    },
+    {
+      category: 'Musculoskeletal',
+      symptoms: ['Joint Pain', 'Back Pain', 'Muscle Pain', 'Neck Pain', 'Arthritis', 'Injury']
+    },
+    {
+      category: 'Neurological',
+      symptoms: ['Migraine', 'Memory Problems', 'Numbness', 'Tingling', 'Seizures', 'Balance Issues']
+    },
+    {
+      category: 'Skin',
+      symptoms: ['Rash', 'Itching', 'Skin Discoloration', 'Wounds', 'Acne', 'Hair Loss']
+    },
+    {
+      category: 'Mental Health',
+      symptoms: ['Anxiety', 'Depression', 'Stress', 'Sleep Problems', 'Mood Changes']
+    },
+    {
+      category: 'Women\'s Health',
+      symptoms: ['Menstrual Problems', 'Pregnancy Concerns', 'Menopause Symptoms', 'Breast Issues']
+    },
+    {
+      category: 'Eye/ENT',
+      symptoms: ['Vision Problems', 'Hearing Loss', 'Ear Pain', 'Eye Pain', 'Discharge']
+    },
+    {
+      category: 'Routine Care',
+      symptoms: ['Annual Check-up', 'Vaccination', 'Lab Test Follow-up', 'Prescription Refill', 'Health Screening']
+    }
+  ];
+
+  const allergyCategories = {
+    medications: {
+      title: "Medication Allergies",
+      items: [
+        "Penicillin (amoxicillin, augmentin)",
+        "Cephalosporins (cefalexin, ceftriaxone)",
+        "Sulfa drugs (sulfamethoxazole)",
+        "Aspirin (ASA)",
+        "NSAIDs (ibuprofen, naproxen)",
+        "Codeine",
+        "Morphine",
+        "Local anesthetics (lidocaine)",
+        "Anticonvulsants (phenytoin, carbamazepine)",
+        "Chemotherapy agents (cisplatin)",
+        "Insulin (non-human)",
+        "Vaccines (egg-based flu vaccines)"
+      ]
+    },
+    foods: {
+      title: "Food Allergies",
+      items: [
+        "Peanuts",
+        "Tree nuts (almonds, walnuts, cashews)",
+        "Shellfish (shrimp, crab, lobster)",
+        "Fish (salmon, tuna, cod)",
+        "Eggs",
+        "Milk / Dairy",
+        "Wheat / Gluten",
+        "Soy",
+        "Sesame",
+        "Corn",
+        "Strawberries",
+        "Tomatoes",
+        "Food dyes / additives (Red Dye 40, MSG)"
+      ]
+    }
+  };
+
+  const handleSymptomToggle = (symptom) => {
+    const isSelected = formData.symptoms.includes(symptom);
+    const updatedSymptoms = isSelected
+      ? formData.symptoms.filter(s => s !== symptom)
+      : [...formData.symptoms, symptom];
+    
+    setFormData({
+      ...formData,
+      symptoms: updatedSymptoms
+    });
+    setError('');
+
+    if (showValidation) {
+      setShowValidation(false);
+      setFieldErrors({});
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+
+    if (showValidation) {
+      setShowValidation(false);
+      setFieldErrors({});
+    }
+  };
+
+  const handleAllergySelect = (allergy, index) => {
+    if (allergy) {
+      const newAllergies = [...selectedAllergies];
+      newAllergies[index] = allergy;
+      setSelectedAllergies(newAllergies);
+      
+      setFormData({
+        ...formData,
+        allergies: newAllergies.filter(a => a).join(', ')
+      });
+    }
+  };
+
+  const addAllergyDropdown = () => {
+    setSelectedAllergies([...selectedAllergies, '']);
+  };
+
+  const removeAllergyDropdown = (index) => {
+    const newAllergies = selectedAllergies.filter((_, i) => i !== index);
+    setSelectedAllergies(newAllergies);
+    
+    setFormData({
+      ...formData,
+      allergies: newAllergies.filter(a => a).join(', ')
+    });
+  };
+
+  const validateStep = (step) => {
+    switch (step) {
+      case 1:
+        return formData.symptoms.length > 0;
+      case 2:
+        return formData.duration && formData.severity;
+      case 3:
+        return formData.preferredDate && formData.preferredTime;
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    const stepErrors = {};
+
+    if (currentStep === 1) {
+      if (formData.symptoms.length === 0) {
+        stepErrors.symptoms = 'Please select at least one symptom';
+      }
+    }
+
+    if (currentStep === 2) {
+      if (!formData.duration) stepErrors.duration = 'Please select duration';
+      if (!formData.severity) stepErrors.severity = 'Please select severity level';
+    }
+
+    if (currentStep === 3) {
+      if (!formData.preferredDate) stepErrors.preferredDate = 'Please select preferred date';
+      if (!formData.preferredTime) stepErrors.preferredTime = 'Please select preferred time';
+    }
+
+    setFieldErrors(stepErrors);
+    setShowValidation(true);
+
+    if (Object.keys(stepErrors).length === 0) {
+      setCurrentStep(currentStep + 1);
+      setShowValidation(false);
+      setError('');
+    } else {
+      if (currentStep === 1) {
+        setError('Please select at least one symptom');
+      } else if (currentStep === 2) {
+        setError('Please fill in all required fields');
+      } else if (currentStep === 3) {
+        setError('Please select your preferred appointment date and time');
+      }
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+    setError('');
+  };
+
+  const generateDepartmentRecommendation = () => {
+    const departmentMapping = {
+      'Fever': 'Internal Medicine',
+      'Chest Pain': 'Cardiology',
+      'Chest Discomfort': 'Cardiology',
+      'Heart Palpitations': 'Cardiology',
+      'High Blood Pressure': 'Cardiology',
+      'Cough': 'Pulmonology',
+      'Shortness of Breath': 'Pulmonology',
+      'Joint Pain': 'Orthopedics',
+      'Back Pain': 'Orthopedics',
+      'Muscle Pain': 'Orthopedics',
+      'Arthritis': 'Rheumatology',
+      'Migraine': 'Neurology',
+      'Seizures': 'Neurology',
+      'Memory Problems': 'Neurology',
+      'Rash': 'Dermatology',
+      'Skin Discoloration': 'Dermatology',
+      'Acne': 'Dermatology',
+      'Vision Problems': 'Ophthalmology',
+      'Eye Pain': 'Ophthalmology',
+      'Hearing Loss': 'ENT',
+      'Ear Pain': 'ENT',
+      'Anxiety': 'Psychiatry',
+      'Depression': 'Psychiatry',
+      'Menstrual Problems': 'Gynecology',
+      'Pregnancy Concerns': 'Obstetrics',
+      'Annual Check-up': 'General Practice',
+      'Vaccination': 'General Practice',
+      'Health Screening': 'General Practice'
+    };
+
+    const primarySymptom = formData.symptoms[0];
+    return departmentMapping[primarySymptom] || 'General Practice';
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      // Get registration info from session
+      const tempRegId = sessionStorage.getItem('tempRegId');
+      const tempPatientId = sessionStorage.getItem('tempPatientId');
+      const patientEmail = sessionStorage.getItem('patientEmail');
+
+      if (!tempRegId || !tempPatientId) {
+        throw new Error('Registration information not found. Please start over.');
+      }
+
+      // Prepare health assessment data according to database schema
+      const healthAssessmentData = {
+        temp_id: parseInt(tempRegId),
+        symptoms: formData.symptoms.join(', '),
+        duration: formData.duration,
+        severity: formData.severity,
+        previous_treatment: formData.previousTreatment || null,
+        allergies: formData.allergies || null,
+        medications: formData.medications || null,
+        preferred_date: formData.preferredDate,
+        preferred_time_slot: formData.preferredTime,
+        scheduled_date: formData.preferredDate,
+        status: 'completed'
+      };
+
+      console.log('Submitting health assessment data:', healthAssessmentData);
+
+      // Update temp registration with health assessment data
+      const response = await fetch(`http://localhost:5000/api/temp-registration/${tempRegId}/health-assessment`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(healthAssessmentData)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Health assessment submission failed');
+      }
+
+      console.log('Health assessment submitted successfully:', result);
+
+      // Generate QR code data
+      const recommendedDepartment = generateDepartmentRecommendation();
+      const qrData = {
+        type: 'mobile_registration',
+        tempRegId: tempRegId,
+        tempPatientId: tempPatientId,
+        patientName: patientInfo.name,
+        department: recommendedDepartment,
+        scheduledDate: formData.preferredDate,
+        preferredTime: formData.preferredTime,
+        symptoms: formData.symptoms.join(', '),
+        severity: formData.severity,
+        timestamp: new Date().toISOString()
+      };
+
+      // Generate and send QR code via email
+      const qrResponse = await fetch('http://localhost:5000/api/generate-qr-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          qrData: qrData,
+          patientEmail: patientEmail,
+          patientName: patientInfo.name
+        })
+      });
+
+      const qrResult = await qrResponse.json();
+
+      if (!qrResponse.ok) {
+        console.warn('QR email sending failed:', qrResult.error);
+        // Continue even if email fails
+      } else {
+        console.log('QR code email sent successfully');
+      }
+
+      // Store QR data in session for confirmation page
+      sessionStorage.setItem('qrCodeData', JSON.stringify(qrData));
+
+      // Show success message
+      alert(`Health assessment completed!\n\nAppointment Request Submitted:\nRecommended Department: ${recommendedDepartment}\nDate: ${formData.preferredDate}\nTime: ${formData.preferredTime}\n\nA QR code has been sent to your email. You can also view it on the next page.`);
+      
+      // Navigate to QR confirmation page
+      window.location.href = '/mobile-qr-confirmation';
+
+    } catch (err) {
+      console.error('Health assessment submission error:', err);
+      setError(err.message || 'Submission failed. Please check your internet connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderSymptomStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-solid fa-stethoscope"></i>
+        </div>
+        <h3>Select Your Symptoms</h3>
+        <p>Choose all symptoms that apply to your current condition</p>
+      </div>
+
+      {formData.symptoms.length > 0 && (
+        <div className="selected-symptoms">
+          <h4>Selected Symptoms ({formData.symptoms.length})</h4>
+          <div className="selected-list">
+            {formData.symptoms.map((symptom, index) => (
+              <button
+                key={index}
+                onClick={() => handleSymptomToggle(symptom)}
+                className="selected-symptom"
+              >
+                <span>{symptom}</span>
+                <span className="remove-icon">×</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="symptom-categories">
+        {symptomCategories.map((category, categoryIndex) => (
+          <div key={categoryIndex} className="symptom-category">
+            <h4 className="category-title">{category.category}</h4>
+            <div className="symptom-grid">
+              {category.symptoms.map((symptom, symptomIndex) => (
+                <button
+                  key={symptomIndex}
+                  onClick={() => handleSymptomToggle(symptom)}
+                  className={`symptom-btn ${
+                    formData.symptoms.includes(symptom) ? 'selected' : ''
+                  }`}
+                >
+                  <span className="symptom-text">{symptom}</span>
+                  {formData.symptoms.includes(symptom) && (
+                    <span className="check-icon">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showValidation && fieldErrors.symptoms && (
+        <div className="assessment-error">{fieldErrors.symptoms}</div>
+      )}
+    </div>
+  );
+
+  const renderDetailsStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-solid fa-clipboard-list"></i>
+        </div>
+        <h3>Symptom Details</h3>
+        <p>Provide more information about your condition</p>
+      </div>
+
+      <div className="form-grid">
+        <div className="input-group">
+          <label>Duration *</label>
+          <select
+            name="duration"
+            value={formData.duration}
+            onChange={handleInputChange}
+            className={`form-input ${fieldErrors.duration ? 'invalid' : ''} ${formData.duration ? 'has-value' : 'empty'}`}
+            required
+          >
+            <option value="" disabled hidden>How long have you had these symptoms?</option>
+            <option value="less-than-day">Less than a day</option>
+            <option value="1-3-days">1-3 days</option>
+            <option value="4-7-days">4-7 days</option>
+            <option value="1-2-weeks">1-2 weeks</option>
+            <option value="2-4-weeks">2-4 weeks</option>
+            <option value="1-3-months">1-3 months</option>
+            <option value="more-than-3-months">More than 3 months</option>
+          </select>
+          {showValidation && fieldErrors.duration && (
+            <small className="error-text">{fieldErrors.duration}</small>
+          )}
+        </div>
+
+        <div className="input-group">
+          <label>Severity Level *</label>
+          <select
+            name="severity"
+            value={formData.severity}
+            onChange={handleInputChange}
+            className={`form-input ${fieldErrors.severity ? 'invalid' : ''} ${formData.severity ? 'has-value' : 'empty'}`}
+            required
+          >
+            <option value="" disabled hidden>Rate your symptom severity</option>
+            <option value="mild">Mild - Doesn't interfere with daily activities</option>
+            <option value="moderate">Moderate - Some interference with activities</option>
+            <option value="severe">Severe - Significant interference</option>
+            <option value="very-severe">Very Severe - Unable to function normally</option>
+          </select>
+          {showValidation && fieldErrors.severity && (
+            <small className="error-text">{fieldErrors.severity}</small>
+          )}
+        </div>
+
+        <div className="input-group">
+          <label>Previous Treatment</label>
+          <input
+            type='text'
+            name="previousTreatment"
+            value={formData.previousTreatment}
+            onChange={handleInputChange}
+            placeholder="Any medications, treatments, or remedies you've tried"
+            className="form-input"
+          />
+        </div>
+
+        <div className="input-group">
+          <label>Known Allergies</label>
+          
+          {selectedAllergies.map((selectedAllergy, index) => (
+            <div key={index} className="allergy-dropdown-container">
+              <select
+                value={selectedAllergy}
+                onChange={(e) => handleAllergySelect(e.target.value, index)}
+                className="form-input"
+              >
+                <option value="">Select an allergy</option>
+                {Object.entries(allergyCategories).map(([categoryKey, category]) => (
+                  <optgroup key={categoryKey} label={category.title}>
+                    {category.items.map((item, itemIndex) => (
+                      <option key={itemIndex} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              
+              {selectedAllergies.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeAllergyDropdown(index)}
+                  className="remove-allergy-btn"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          
+          <button
+            type="button"
+            onClick={addAllergyDropdown}
+            className="add-allergy-btn"
+          >
+            + Add Known Allergy
+          </button>
+        </div>
+
+        <div className="input-group">
+          <label>Current Medications</label>
+          <input
+            type='text'
+            name="medications"
+            value={formData.medications}
+            onChange={handleInputChange}
+            placeholder="List any medications you're currently taking"
+            className="form-input"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSchedulingStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-regular fa-calendar"></i>
+        </div>
+        <h3>Appointment Scheduling</h3>
+        <p>Choose your preferred appointment date and time</p>
+      </div>
+
+      <div className="form-grid">
+        <div className="input-group">
+          <label>Preferred Date *</label>
+          <input
+            type="date"
+            name="preferredDate"
+            value={formData.preferredDate}
+            onChange={handleInputChange}
+            min={new Date().toISOString().split('T')[0]}
+            className={`form-input ${fieldErrors.preferredDate ? 'invalid' : ''} ${formData.preferredDate ? 'has-value' : 'empty'}`}
+            required
+          />
+          {showValidation && fieldErrors.preferredDate && (
+            <small className="error-text">{fieldErrors.preferredDate}</small>
+          )}
+        </div>
+
+        <div className="input-group">
+          <label>Preferred Time *</label>
+          <select
+            name="preferredTime"
+            value={formData.preferredTime}
+            onChange={handleInputChange}
+            className={`form-input ${fieldErrors.preferredTime ? 'invalid' : ''} ${formData.preferredTime ? 'has-value' : 'empty'}`}
+            required
+          >
+            <option value="" disabled hidden>Select preferred time</option>
+            <option value="morning">Morning (8:00 AM - 12:00 PM)</option>
+            <option value="afternoon">Afternoon (12:00 PM - 5:00 PM)</option>
+            <option value="evening">Evening (5:00 PM - 8:00 PM)</option>
+            <option value="anytime">Any available time</option>
+          </select>
+          {showValidation && fieldErrors.preferredTime && (
+            <small className="error-text">{fieldErrors.preferredTime}</small>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSummaryStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-solid fa-clipboard-check"></i>
+        </div>
+        <h3>Assessment Summary</h3>
+        <p>Review your information before submitting</p>
+      </div>
+
+      <div className="summary-sections">
+        <div className="summary-section">
+          <h4><i className="fa-solid fa-stethoscope"></i> Selected Symptoms</h4>
+          <div className="summary-symptoms">
+            {formData.symptoms.map((symptom, index) => (
+              <span key={index} className="summary-symptom">{symptom}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="summary-section">
+          <h4><i className="fa-solid fa-notes-medical"></i> Condition Details</h4>
+          <div className="summary-details">
+            <div className="summary-item">
+              <strong>Duration:</strong>
+              <span>{formData.duration.replace('-', ' ')}</span>
+            </div>
+            <div className="summary-item">
+              <strong>Severity:</strong>
+              <span>{formData.severity}</span>
+            </div>
+            {formData.previousTreatment && (
+              <div className="summary-item">
+                <strong>Previous Treatment:</strong>
+                <span>{formData.previousTreatment}</span>
+              </div>
+            )}
+            {formData.allergies && (
+              <div className="summary-item">
+                <strong>Allergies:</strong>
+                <span>{formData.allergies}</span>
+              </div>
+            )}
+            {formData.medications && (
+              <div className="summary-item">
+                <strong>Current Medications:</strong>
+                <span>{formData.medications}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="summary-section">
+          <h4><i className="fa-regular fa-calendar"></i> Appointment Preferences</h4>
+          <div className="summary-details">
+            <div className="summary-item">
+              <strong>Preferred Date:</strong>
+              <span>{formData.preferredDate}</span>
+            </div>
+            <div className="summary-item">
+              <strong>Preferred Time:</strong>
+              <span>{formData.preferredTime}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="recommendation-section">
+          <div className="recommendation-icon">
+            <i className="fa-solid fa-hospital"></i>
+          </div>
+          <div className="recommendation-content">
+            <h4>Recommended Department</h4>
+            <p><strong>{generateDepartmentRecommendation()}</strong></p>
+            <small>Based on your symptoms, we recommend starting with this department. The doctor may refer you to other specialists if needed.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderProgressBar = () => (
+    <div className="progress-container">
+      <div className="progress-steps">
+        {[1, 2, 3, 4].map((step) => (
+          <React.Fragment key={step}>
+            <div className={`progress-step-item ${currentStep >= step ? 'active' : ''}`}>
+              <div className="progress-step">
+                <span className="step-number">
+                  {currentStep > step ? <i className="fa-solid fa-check"></i> : step}
+                </span>
+                <span className="step-label">
+                  {step === 1 ? 'Symptoms' :
+                   step === 2 ? 'Details' :
+                   step === 3 ? 'Schedule' : 'Summary'}
+                </span>
+              </div>
+              {step < 4 && (
+                <div className={`progress-line ${currentStep > step ? 'completed' : ''}`}></div>
+              )}
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return renderSymptomStep();
+      case 2:
+        return renderDetailsStep();
+      case 3:
+        return renderSchedulingStep();
+      case 4:
+        return renderSummaryStep();
+      default:
+        return renderSymptomStep();
+    }
+  };
+
+  const renderNavigationButtons = () => {
+    if (currentStep === 4) {
+      return (
+        <div className="nav-buttons">
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="nav-btn secondary"
+            disabled={loading}
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+          <button 
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="nav-btn submit"
+          >
+            {loading ? (
+              <>
+                <span className="loading-spinner"></span>
+                Submitting...
+              </>
+            ) : (
+              'Generate QR Code'
+            )}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="nav-buttons">
+        {currentStep > 1 && (
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="nav-btn secondary"
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+        )}
+        <button 
+          type="button"
+          onClick={nextStep}
+          className="nav-btn primary"
+          disabled={!validateStep(currentStep)}
+        >
+          Continue<i className="fa-solid fa-greater-than"></i>
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="health-assessment">
+      <div className="assessment-header">
+        <div className="assessment-logo">
+          <i className="fa-solid fa-hospital"></i>
+        </div>
+        <div className="assessment-title">
+          <h1>CliCare</h1>
+          <p>Health Assessment</p>
+        </div>
+        <div className="assessment-hospital-info">
+          <p><strong>{formatTime(currentTime)}</strong></p>
+          <p>{formatDate(currentTime)}</p>
+        </div>
+        <button 
+          onClick={() => window.location.href = '/mobile-patient-dashboard'}
+          className="assessment-close"
+        >
+          ✕
+        </button>
+      </div>
+
+      {renderProgressBar()}
+      
+      <div className="assessment-content">
+        <div className="assessment-patient-info">
+          <p>Patient: <strong>{patientInfo.name}</strong> | ID: <strong>{patientInfo.patientId}</strong></p>
+        </div>
+
+        {error && <div className="assessment-error">{error}</div>}
+        
+        {renderCurrentStep()}
+      </div>
+
+      <div className="assessment-nav-container">
+        {renderNavigationButtons()}
+      </div>
+    </div>
+  );
+};
+
+export default MobileHealthAssessment;
