@@ -1,226 +1,454 @@
-// adminlogin.js
-import React, { useState, useEffect } from 'react';
-import './adminlogin.css';
-import { adminApi, adminUtils } from '../../services/adminApi';
+/* adminlogin.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import '@fortawesome/fontawesome-free/css/all.css';
 
-const AdminLogin = () => {
-  const [formData, setFormData] = useState({
-    healthadminid: '',
-    password: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [showValidation, setShowValidation] = useState(false);
+.admin-portal {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4285f4 0%, #1a73e8 50%, #1557b0 100%);
+  font-family: 'Poppins', sans-serif;
+  position: relative;
+  padding: 0;
+}
 
-  useEffect(() => {
-    const storedError = localStorage.getItem('loginError');
-    if (storedError) {
-      setError(storedError);
-      localStorage.removeItem('loginError');
-    }
+.admin-portal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="admin-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23admin-grid)"/></svg>');
+  pointer-events: none;
+}
 
-    if (adminUtils.isAuthenticated() && !adminUtils.isTokenExpired() && localStorage.getItem('adminInfo')) {
-      window.location.replace('/admin-dashboard');
-    }
-  }, []);
+/* Header */
+.admin-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  padding: 20px 20px 15px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(66, 133, 244, 0.2);
+  position: relative;
+  z-index: 10;
+}
 
-  // Event Handlers
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+.admin-logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #4285f4, #1a73e8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0 auto 12px auto;
+  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+}
 
-    if (showValidation) {
-      setShowValidation(false);
-      setFieldErrors({});
-    }
+.admin-header h1 {
+  color: #1557b0;
+  font-size: 2.2em;
+  margin: 0 0 5px 0;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
 
-    if (error) {
-      setError('');
-      localStorage.removeItem('loginError');
-    }
-  };
+.admin-header p {
+  color: #5f6368;
+  font-size: 0.9em;
+  margin: 0;
+  font-weight: 500;
+}
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e);
-    }
-  };
+.admin-content {
+  padding: 25px 20px 30px 20px;
+  position: relative;
+  z-index: 5;
+  max-width: 500px;
+  margin: 0 auto;
+}
 
-  const handleForgotPassword = () => {
-    alert('Please contact IT support at support@clicare.com for password reset.');
-  };
+.admin-card {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 40px 35px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+.admin-form-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
 
-    const stepErrors = {};
+.admin-form-header h2 {
+  color: #202124;
+  font-size: 1.6em;
+  margin: 0 0 5px 0;
+  font-weight: 600;
+}
 
-    if (!formData.healthadminid.trim()) {
-      stepErrors.healthadminid = 'Admin ID is required';
-    }
+.admin-form-header p {
+  color: #5f6368;
+  font-size: 0.9em;
+  margin: 0;
+  font-weight: 400;
+}
 
-    if (!formData.password.trim()) {
-      stepErrors.password = 'Password is required';
-    }
+.admin-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
 
-    setFieldErrors(stepErrors);
-    setShowValidation(true);
+.admin-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
+  border: 3px solid #4285f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
 
-    if (Object.keys(stepErrors).length > 0) {
-      setLoading(false);
-      return;
-    }
+.admin-icon .fa-regular.fa-user {
+  color: #4285f4;
+}
 
-    try {
-      const response = await adminApi.login({
-        healthadminid: formData.healthadminid.trim(),
-        password: formData.password
-      });
+/* Error Display */
+.admin-error {
+  background: linear-gradient(145deg, #fce8e6 0%, #fad2cf 100%);
+  color: #d93025;
+  padding: 14px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border: 1px solid #ea4335;
+  font-weight: 500;
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9em;
+}
 
-      if (response.success) {
-        window.location.href = '/admin-dashboard';
-      } else {
-        localStorage.setItem('loginError', response.message || 'Login failed. Please try again.');
-        window.location.reload();
-        return;
-      }
+.admin-login-form {
+  margin-bottom: 25px;
+}
 
-    } catch (error) {
-      console.error('Login error:', error);
-      localStorage.setItem('loginError', adminUtils.formatErrorMessage(error));
-      window.location.reload();
-      return;
-    } finally {
-      setLoading(false);
-    }
-  };
+.admin-input-group {
+  margin-bottom: 20px;
+}
 
-  return (
-    <div className="admin-portal">
-      <div className="admin-header">
-        <div className="admin-logo">🏥</div>
-        <h1>CliCare</h1>
-        <p>Administrator Portal</p>
-      </div>
+.admin-input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #202124;
+  font-weight: 600;
+  font-size: 0.9em;
+}
 
-      <div className="admin-content">
-        <div className="admin-card">
-          <div className="admin-form-header">
-            <div className="admin-indicator">
-              <div className="admin-icon"><i className="fa-regular fa-user"></i></div>
-            </div>
-            <h2>Admin Login</h2>
-            <p>Access your administrative dashboard</p>
-          </div>
+.admin-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
 
-          {error && <div className="admin-error">{error}</div>}
+.admin-input-icon {
+  position: absolute;
+  left: 14px;
+  z-index: 2;
+  font-size: 1.1em;
+  color: #5f6368;
+}
 
-          <form onSubmit={handleSubmit} className="admin-login-form">
-            <div className="admin-input-group">
-              <label>Admin ID</label>
-              <div className="admin-input-wrapper">
-                <span className="admin-input-icon"><i className="fa-solid fa-user"></i></span>
-                <input
-                  type="text"
-                  name="healthadminid"
-                  value={formData.healthadminid}
-                  onChange={handleInputChange}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Enter your admin ID"
-                  className={`admin-form-input ${fieldErrors.healthadminid ? 'invalid' : ''}`}
-                  disabled={loading}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                  autoFocus
-                />
-              </div>
-              {showValidation && fieldErrors.healthadminid && (
-                <small className="error-text">{fieldErrors.healthadminid}</small>
-              )}
-            </div>
+.admin-form-input {
+  width: 100%;
+  padding: 14px 16px 14px 45px;
+  border: 2px solid #dadce0;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  background: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+}
 
-            <div className="admin-input-group">
-              <label>Password</label>
-              <div className="admin-input-wrapper">
-                <span className="admin-input-icon"><i className="fa-solid fa-lock"></i></span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Enter your password"
-                  className={`admin-form-input ${fieldErrors.password ? 'invalid' : ''}`}
-                  disabled={loading}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="admin-password-toggle"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <i className="fa-solid fa-eye"></i> : <i className="fa-solid fa-eye-slash"></i>}
-                </button>
-              </div>
-              {showValidation && fieldErrors.password && (
-                <small className="error-text">{fieldErrors.password}</small>
-              )}
-            </div>
+.admin-form-input:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+}
 
-            <div className="admin-form-options">
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="admin-forgot-password"
-                disabled={loading}
-              >
-                Forgot password?
-              </button>
-            </div>
+.admin-form-input.invalid {
+  border-color: #ea4335;
+  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.1);
+}
 
-            <button
-              type="submit"
-              className="admin-login-btn"
-              disabled={loading}
-            >
-              Sign In
-            </button>
-          </form>
-        </div>
+.admin-form-input.invalid:focus {
+  border-color: #ea4335;
+  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.1);
+}
 
-        <div className="admin-help-section">
-          <h3><i className="fa-solid fa-phone"></i> Need Help?</h3>
-          <div className="admin-contact-grid">
-            <div className="admin-contact-item">
-              <strong>IT Support</strong>
-              <p>support@clicare.com</p>
-              <small>Technical assistance</small>
-            </div>
-            <div className="admin-contact-item">
-              <strong>Admin Help</strong>
-              <p>+1 (555) 123-4567</p>
-              <small>24/7 support line</small>
-            </div>
-          </div>
-        </div>
-      </div>
+.admin-password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1em;
+  color: #5f6368;
+  padding: 5px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  z-index: 2;
+}
 
-      <div className="admin-footer">
-        <p>CliCare Hospital Management System</p>
-        <p>Secure Admin Access Portal</p>
-      </div>
-    </div>
-  );
-};
+.admin-password-toggle:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
 
-export default AdminLogin;
+.admin-input-hint {
+  display: block;
+  color: #5f6368;
+  font-size: 0.8em;
+  margin-top: 5px;
+  font-weight: 400;
+}
+
+.error-text {
+  display: block;
+  color: #ea4335;
+  font-size: 0.8em;
+  margin-top: 5px;
+  font-weight: 500;
+  font-family: 'Poppins', sans-serif;
+}
+
+.admin-form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-forgot-password {
+  background: none;
+  border: none;
+  color: #4285f4;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 5px 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.admin-forgot-password:hover {
+  text-decoration: none;
+}
+
+/* Login Button */
+.admin-login-btn {
+  width: 100%;
+  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
+  color: white;
+  border: none;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.admin-login-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
+}
+
+.admin-login-btn:disabled {
+  background: #9aa0a6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Help Section */
+.admin-help-section {
+  background: #f8f9fa;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.admin-help-section h3 {
+  color: #202124;
+  margin-bottom: 15px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.admin-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.admin-contact-item {
+  text-align: center;
+}
+
+.admin-contact-item strong {
+  color: #4285f4;
+  font-size: 0.9em;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.admin-contact-item p {
+  color: #202124;
+  margin: 0 0 3px 0;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+/* Footer */
+.admin-footer {
+  text-align: center;
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 30px;
+}
+
+.admin-footer p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.8em;
+  margin: 5px 0;
+  font-weight: 400;
+}
+
+/* Media Queries */
+@media (max-width: 768px) {
+  .admin-content {
+    padding: 20px 15px 25px 15px;
+  }
+ 
+  .admin-card {
+    padding: 35px 30px;
+    border-radius: 16px;
+  }
+ 
+  .admin-contact-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+ 
+  .admin-form-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-header {
+    padding: 15px 15px 12px 15px;
+  }
+ 
+  .admin-logo {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3em;
+  }
+ 
+  .admin-header h1 {
+    font-size: 1.8em;
+  }
+ 
+  .admin-content {
+    padding: 15px 12px 20px 12px;
+  }
+ 
+  .admin-card {
+    padding: 30px 25px;
+  }
+ 
+  .admin-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 22px;
+  }
+ 
+  .admin-form-header h2 {
+    font-size: 1.4em;
+  }
+}
+
+@media (max-width: 360px) {
+  .admin-header h1 {
+    font-size: 1.6em;
+  }
+ 
+  .admin-content {
+    padding: 12px 10px 15px 10px;
+  }
+ 
+  .admin-card {
+    padding: 28px 22px;
+  }
+ 
+  .admin-icon {
+    width: 55px;
+    height: 55px;
+    font-size: 20px;
+  }
+ 
+  .admin-form-header h2 {
+    font-size: 1.3em;
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .admin-header {
+    padding: 10px 20px 8px 20px;
+  }
+ 
+  .admin-logo {
+    width: 45px;
+    height: 45px;
+    font-size: 1.2em;
+  }
+ 
+  .admin-header h1 {
+    font-size: 1.6em;
+    margin-bottom: 2px;
+  }
+ 
+  .admin-content {
+    padding: 15px 20px 20px 20px;
+  }
+ 
+  .admin-card {
+    padding: 30px;
+  }
+}
