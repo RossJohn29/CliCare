@@ -1,479 +1,633 @@
-// mobilepatientlogin.js
-import React, { useState, useEffect } from 'react';
-import './mobilepatientlogin.css';
+/* mobilepatientlogin.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import '@fortawesome/fontawesome-free/css/all.css';
 
-const MobilePatientLogin = () => {
-  const [patientType, setPatientType] = useState('');
-  const [loginMethod, setLoginMethod] = useState('email');
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [showValidation, setShowValidation] = useState(false);
-  const [credentials, setCredentials] = useState({
-    patientId: '',
-    email: '',
-    phoneNumber: '',
-    otp: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
-  const [error, setError] = useState('');
-  const [countdown, setCountdown] = useState(0);
-  const [justSent, setJustSent] = useState(false);
+.mobile-patient-portal {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4285f4 0%, #1a73e8 50%, #1557b0 100%);
+  font-family: 'Poppins', sans-serif;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
 
-  useEffect(() => {
-    let timer;
-    if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [countdown]);
+.mobile-patient-portal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="mobile-dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="0.8" fill="rgba(255,255,255,0.06)"/></pattern></defs><rect width="100" height="100" fill="url(%23mobile-dots)"/></svg>');
+  pointer-events: none;
+}
 
-  // Enhanced phone number validation
-  const validatePhoneNumber = (phone) => {
-    // Philippine mobile number format
-    const phoneRegex = /^(09|\+639|639)\d{9}$/;
-    return phoneRegex.test(phone.replace(/\s|-/g, ''));
-  };
+.mobile-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  padding: 15px 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(66, 133, 244, 0.2);
+  position: relative;
+  z-index: 10;
+  min-height: 60px;
+}
 
-  // Enhanced email validation
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+.mobile-logo {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #4285f4, #1a73e8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.3em;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+}
 
-  const handleInputChange = (e) => {
-    setCredentials({ ...credentials, [e.target.name]: e.target.value });
-    
-    if (showValidation) {
-      setShowValidation(false);
-      setFieldErrors({});
-    }
-    
-    setError('');
-  };
+.mobile-title {
+  flex: 1;
+  text-align: center;
+}
 
-  const handleMethodSwitch = (method) => {
-    setLoginMethod(method);
-    setCodeSent(false);
-    setJustSent(false);
-    setCredentials((prev) => ({ ...prev, otp: '' }));
-    setError('');
-    // Clear field-specific errors when switching methods
-    setFieldErrors({});
-    setShowValidation(false);
-  };
+.mobile-title h1 {
+  color: #1557b0;
+  font-size: 1.8em;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
 
-  const handleSendOTP = async () => {
-    const stepErrors = {};
-    
-    if (!credentials.patientId.trim()) {
-      stepErrors.patientId = 'Patient ID is required';
-    }
+.mobile-title p {
+  color: #5f6368;
+  font-size: 0.85em;
+  margin: 3px 0 0 0;
+  font-weight: 500;
+}
 
-    const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
-    if (!contactValue.trim()) {
-      if (loginMethod === 'email') {
-        stepErrors.email = 'Email address is required';
-      } else {
-        stepErrors.phoneNumber = 'Phone number is required';
-      }
-    } else {
-      // Enhanced validation
-      if (loginMethod === 'email' && !validateEmail(contactValue)) {
-        stepErrors.email = 'Please enter a valid email address';
-      }
-      if (loginMethod === 'phone' && !validatePhoneNumber(contactValue)) {
-        stepErrors.phoneNumber = 'Please enter a valid Philippine mobile number (09XXXXXXXXX)';
-      }
-    }
+.mobile-hospital-info {
+  text-align: right;
+  color: #5f6368;
+}
 
-    setFieldErrors(stepErrors);
-    setShowValidation(true);
+.mobile-hospital-info p {
+  margin: 0;
+  font-size: 0.8em;
+  font-weight: 500;
+}
 
-    if (Object.keys(stepErrors).length > 0) {
-      return;
-    }
+.mobile-hospital-info strong {
+  color: #202124;
+  font-weight: 600;
+}
 
-    setSendingCode(true);
-    setError('');
+.mobile-content {
+  flex: 1;
+  padding: 20px;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    try {
-      const response = await fetch('http://localhost:5000/api/outpatient/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          patientId: credentials.patientId.toUpperCase(),
-          contactInfo: contactValue,
-          contactType: loginMethod
-        })
-      });
+.mobile-card {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 40px 35px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+}
 
-      const data = await response.json();
+.mobile-welcome {
+  text-align: center;
+  margin-bottom: 25px;
+}
 
-      if (!response.ok) {
-        setError(data.error || 'Failed to send verification code');
-        setSendingCode(false);
-        return;
-      }
+.mobile-welcome h2 {
+  color: #202124;
+  font-size: 1.6em;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
 
-      setCodeSent(true);
-      setJustSent(true);
-      
-      setTimeout(() => {
-        setJustSent(false);
-        setCountdown(120);
-      }, 2000);
-    } catch (err) {
-      console.error('Send OTP error:', err);
-      setError('Connection error. Please check your internet and try again.');
-    } finally {
-      setSendingCode(false);
-    }
-  };
+.mobile-welcome p {
+  color: #5f6368;
+  font-size: 0.9em;
+  margin: 0 0 20px 0;
+  font-weight: 500;
+}
 
-  const handleLogin = async () => {
-    setLoading(true);
-    setError('');
+.mobile-patient-types {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
 
-    const stepErrors = {};
+.mobile-patient-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  width: 100%;
+  font-family: 'Poppins', sans-serif;
+}
 
-    if (!credentials.patientId.trim()) {
-      stepErrors.patientId = 'Patient ID is required';
-    }
+.mobile-patient-btn:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
 
-    if (!codeSent) {
-      stepErrors.otp = 'Please send verification code first';
-    } else if (!credentials.otp.trim()) {
-      stepErrors.otp = 'Verification code is required';
-    }
+.mobile-patient-btn .icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 100%;
+  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4285f4;
+  font-size: 20px;
+  flex-shrink: 0;
+}
 
-    const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
-    if (!contactValue.trim()) {
-      if (loginMethod === 'email') {
-        stepErrors.email = 'Email address is required';
-      } else {
-        stepErrors.phoneNumber = 'Phone number is required';
-      }
-    }
+.mobile-btn-content {
+  flex: 1;
+  margin: 0 16px;
+}
 
-    setFieldErrors(stepErrors);
-    setShowValidation(true);
+.mobile-btn-content h3 {
+  margin: 0 0 1px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
 
-    if (Object.keys(stepErrors).length > 0) {
-      setLoading(false);
-      return;
-    }
+.mobile-btn-content p {
+  font-size: 13px;
+  color: #4285f4;
+  font-weight: 500;
+  margin: 0;
+}
 
-    try {
-      const requestBody = {
-        patientId: credentials.patientId.toUpperCase(),
-        contactInfo: contactValue,
-        otp: credentials.otp,
-        deviceType: 'mobile'
-      };
+.mobile-btn-content small {
+  font-size: 11px;
+  color: #1f2937;
+  line-height: 1;
+}
 
-      console.log('Sending login request:', requestBody);
+.mobile-arrow {
+  font-size: 20px;
+  color: #6b7280;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
 
-      const response = await fetch('http://localhost:5000/api/outpatient/verify-otp', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify(requestBody)
-      });
+.mobile-patient-btn:hover .mobile-arrow {
+  color: #3b82f6;
+  transform: translateX(4px);
+}
 
-      const data = await response.json();
-      console.log('Login response:', data);
+.mobile-form-header {
+  text-align: center;
+  margin-bottom: 25px;
+  position: relative;
+}
 
-      if (!response.ok) {
-        setError(data.error || 'Login failed. Please check your verification code.');
-        setLoading(false);
-        return;
-      }
+.mobile-patient-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
 
-      // Store comprehensive patient data
-      localStorage.setItem('patientToken', data.token);
-      localStorage.setItem('patientId', data.patient.patient_id);
-      localStorage.setItem('patientName', data.patient.name);
-      localStorage.setItem('patientInfo', JSON.stringify(data.patient));
+.mobile-indicator {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
+  border: 3px solid #4285f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
 
-      // Store emergency contact separately for easy access
-      if (data.patient.emergency_contact_name) {
-        localStorage.setItem('emergencyContact', JSON.stringify({
-          name: data.patient.emergency_contact_name,
-          relationship: data.patient.emergency_contact_relationship,
-          contact_no: data.patient.emergency_contact_no
-        }));
-      }
+.mobile-indicator .fa-regular.fa-user, 
+.mobile-indicator .fa-regular.fa-hospital, 
+.mobile-indicator .fa-solid.fa-user-plus { 
+  color: #4285f4; 
+}
 
-      // Store login metadata
-      localStorage.setItem('loginMethod', loginMethod);
-      localStorage.setItem('deviceType', 'mobile');
-      localStorage.setItem('loginTimestamp', new Date().toISOString());
+.mobile-form-header h3 {
+  color: #202124;
+  font-size: 1.6em;
+  margin: 0 0 5px 0;
+  font-weight: 600;
+}
 
-      console.log('✅ Login successful for:', data.patient.name);
-      
-      // Use window.location.replace for better security
-      window.location.replace('/mobile-patient-dashboard');
+.mobile-form-header p {
+  color: #5f6368;
+  font-size: 0.9em;
+  margin: 0;
+  font-weight: 400;
+}
 
-    } catch (err) {
-      console.error('Login error:', err);
-      setError('Connection error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+.mobile-login-form {
+  text-align: left;
+}
 
-  /* Patient Type Selection */
-  const renderPatientTypeSelection = () => (
-    <div className="mobile-card">
-      <div className="mobile-form-header">
-        <div className="mobile-patient-indicator">
-          <span className="mobile-indicator">
-            <i className="fa-regular fa-hospital"></i>
-          </span>
-        </div>
-        <h3>Welcome to CliCare</h3>
-        <p>Choose your access type below</p>
-      </div>
+.mobile-input-group {
+  margin-bottom: 20px;
+}
 
-      <div className="mobile-patient-types">
-        <button onClick={() => setPatientType('old')} className="mobile-patient-btn">
-          <div className="icon"><i className="fa-solid fa-user"></i></div>
-          <div className="mobile-btn-content">
-            <h3>Returning Patient</h3>
-            <p>I have a Patient ID</p>
-            <small>Access your medical records and book appointments</small>
-          </div>
-        </button>
+.mobile-input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #202124;
+  font-weight: 600;
+  font-size: 0.9em;
+}
 
-        <button onClick={() => setPatientType('new')} className="mobile-patient-btn">
-          <div className="icon"><i className="fa-solid fa-user-plus"></i></div>
-          <div className="mobile-btn-content">
-            <h3>New Patient</h3>
-            <p>First time here</p>
-            <small>Create your patient account in minutes</small>
-          </div>
-        </button>
-      </div>
-    </div>
-  );
+.mobile-form-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #dadce0;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+  box-sizing: border-box;
+}
 
-  /* Old Patient */
-  const renderOldPatientLogin = () => (
-    <div className="mobile-card">
-      <div className="mobile-form-header">
-        <div className="mobile-patient-indicator">
-          <span className="mobile-indicator">
-            <i className="fa-regular fa-user"></i>
-          </span>
-        </div>
-        <h3>Welcome Back!</h3>
-        <p>Enter your details to access your account</p>
-      </div>
+.mobile-form-input:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+}
 
-      {error && <div className="mobile-error">{error}</div>}
+.mobile-form-input:disabled {
+  background: #f8f9fa;
+  color: #80868b;
+  cursor: not-allowed;
+  border-color: #e8eaed;
+}
 
-      <div className="mobile-login-form">
-        <div className="mobile-input-group">
-          <label>Patient ID</label>
-          <input
-            type="text"
-            name="patientId"
-            value={credentials.patientId}
-            onChange={handleInputChange}
-            placeholder="Enter Patient ID (e.g., PAT001)"
-            className={`mobile-form-input ${fieldErrors.patientId ? 'invalid' : ''}`}
-            required
-            autoComplete="off"
-            spellCheck="false"
-          />
-          <small className="mobile-input-hint">
-            Found on your patient card or previous visit documents
-          </small>
-          {showValidation && fieldErrors.patientId && (
-            <small className="error-text">{fieldErrors.patientId}</small>
-          )}
-        </div>
+/* Error Handling Styles */
+.mobile-form-input.invalid {
+  border-color: #ea4335;
+  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.1);
+}
 
-        <div className="mobile-input-group">
-          <div className="mobile-method-selection">
-            <label>Verification Method</label>
-            <div className="mobile-method-toggle">
-              <button
-                type="button"
-                onClick={() => handleMethodSwitch('email')}
-                className={`mobile-method-btn ${loginMethod === 'email' ? 'active' : ''}`}
-              >
-                <i className="fa-solid fa-envelope"></i> Email
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMethodSwitch('phone')}
-                className={`mobile-method-btn ${loginMethod === 'phone' ? 'active' : ''}`}
-              >
-                <i className="fa-solid fa-phone"></i> SMS
-              </button>
-            </div>
-          </div>
-          
-          <label>{loginMethod === 'email' ? 'Email Address' : 'Phone Number'}</label>
-          <div className="mobile-contact-group">
-            <input
-              type={loginMethod === 'email' ? 'email' : 'tel'}
-              name={loginMethod === 'email' ? 'email' : 'phoneNumber'}
-              value={loginMethod === 'email' ? credentials.email : credentials.phoneNumber}
-              onChange={handleInputChange}
-              placeholder={loginMethod === 'email' ? 'you@example.com' : '09XX-XXX-XXXX'}
-              className={`mobile-form-input ${fieldErrors[loginMethod === 'email' ? 'email' : 'phoneNumber'] ? 'invalid' : ''}`}
-              required
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              onClick={handleSendOTP}
-              className="mobile-otp-send-btn"
-              disabled={sendingCode || justSent || countdown > 0}
-            >
-              {sendingCode
-                ? (<><span className="mobile-loading-spinner"></span> Sending...</>)
-                : justSent
-                  ? 'Sent'
-                  : countdown > 0
-                    ? `Resend in ${countdown}s`
-                    : 'Send Code'}
-            </button>
-          </div>
-          <small className="mobile-input-hint">
-            We'll send a verification code to your registered {loginMethod}
-          </small>
-          {showValidation && fieldErrors[loginMethod === 'email' ? 'email' : 'phoneNumber'] && (
-            <small className="error-text">{fieldErrors[loginMethod === 'email' ? 'email' : 'phoneNumber']}</small>
-          )}
-        </div>
+.mobile-form-input.invalid:focus {
+  border-color: #ea4335;
+  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.1);
+}
 
-        <div className="mobile-input-group">
-          <label>Verification Code</label>
-          <input
-            type="text"
-            name="otp"
-            value={credentials.otp}
-            onChange={handleInputChange}
-            placeholder="Enter 6-digit verification code"
-            className={`mobile-form-input ${fieldErrors.otp ? 'invalid' : ''}`}
-            maxLength="6"
-            disabled={sendingCode}
-            required
-          />
-          <small className="mobile-input-hint">
-            {codeSent
-              ? (<><i className="fa-solid fa-square-check"></i> Code sent to your {loginMethod}</>)
-              : (<><i className="fa-solid fa-triangle-exclamation"></i> Please send verification code first</>)
-            }
-          </small>
-          {showValidation && fieldErrors.otp && (
-            <small className="error-text">{fieldErrors.otp}</small>
-          )}
-        </div>
+.error-text {
+  display: block;
+  color: #ea4335;
+  font-size: 0.8em;
+  margin-top: 5px;
+  font-weight: 500;
+  font-family: 'Poppins', sans-serif;
+}
 
-        <button 
-          type="button" 
-          onClick={handleLogin} 
-          className="mobile-access-btn"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <span className="mobile-loading-spinner"></span>
-              Signing In...
-            </>
-          ) : (
-            'Sign In'
-          )}
-        </button>
+.mobile-input-hint {
+  display: block;
+  color: #5f6368;
+  font-size: 0.8em;
+  margin-top: 5px;
+  font-weight: 400;
+}
 
-        <div className="mobile-account-toggle">
-          <p>
-            Don't have an account?{' '}
-            <button onClick={() => setPatientType('new')} className="mobile-account-link">
-              Register here
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+.mobile-input-hint .fa-solid.fa-square-check { 
+  color: #28a745; 
+} 
 
-  /* New Patient Registration */
-  const renderNewPatientRedirect = () => (
-    <div className="mobile-card">
-      <div className="mobile-form-header">
-        <div className="mobile-patient-indicator">
-          <span className="mobile-indicator">
-            <i className="fa-solid fa-user-plus"></i>
-          </span>
-        </div>
-        <h3>Create Your Account</h3>
-        <p>Join CliCare for better healthcare management</p>
-      </div>
+.mobile-input-hint .fa-solid.fa-triangle-exclamation { 
+  color: #FFC107; 
+}
 
-      <div className="mobile-reg-info">
-        <div className="mobile-info-card">
-          <h4>Quick Registration Process:</h4>
-          <ul className="mobile-info-list">
-            <li><i className="fa-solid fa-check"></i> Personal information (name, age, contact)</li>
-            <li><i className="fa-solid fa-check"></i> Emergency contact details</li>
-            <li><i className="fa-solid fa-check"></i> Optional ID scan for faster setup</li>
-            <li><i className="fa-solid fa-check"></i> Review and confirm your details</li>
-          </ul>
-        </div>
-      </div>
+.mobile-method-selection {
+  margin-bottom: 20px;
+}
 
-      <button
-        onClick={() => (window.location.href = '/mobile-patient-register')}
-        className="mobile-access-btn"
-      >
-        Start Registration
-      </button>
+.mobile-method-toggle {
+  display: flex;
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border: 1px solid #e8eaed;
+}
 
-      <div className="mobile-account-toggle">
-        <p>
-          Already have an account?{' '}
-          <button onClick={() => setPatientType('old')} className="mobile-account-link">
-            Sign in
-          </button>
-        </p>
-      </div>
-    </div>
-  );
+.mobile-method-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  background: transparent;
+  color: #5f6368;
+  font-family: 'Poppins', sans-serif;
+  transition: all 0.3s ease;
+}
 
-  return (
-    <div className="mobile-patient-portal">
-      <div className="mobile-header">
-        <div className="mobile-logo">CliCare</div>
-        <div className="mobile-title">
-          <h1>CliCare</h1>
-          <p>Digital Patient Management</p>
-        </div>
-        <div className="mobile-hospital-info">
-          <p><strong>Mobile Portal</strong></p>
-          <p>Patient Access</p>
-        </div>
-      </div>
+.mobile-method-btn.active {
+  background: white;
+  color: #4285f4;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
 
-      <div className="mobile-content">
-        {!patientType && renderPatientTypeSelection()}
-        {patientType === 'old' && renderOldPatientLogin()}
-        {patientType === 'new' && renderNewPatientRedirect()}
-      </div>
+.mobile-method-btn .fa-solid.fa-envelope,
+.mobile-method-btn .fa-solid.fa-phone {
+  margin-right: 5px;
+}
 
-      <div className="mobile-footer">
-        <p>Secure patient access • Need help? Tap to call (02) 8123-4567</p>
-      </div>
-    </div>
-  );
-};
+.mobile-contact-group {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
 
-export default MobilePatientLogin;
+.mobile-contact-group .mobile-form-input {
+  flex: 1;
+}
+
+.mobile-send-btn {
+  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
+  color: white;
+  border: none;
+  padding: 14px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-family: 'Poppins', sans-serif;
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.mobile-reg-info {
+  margin: 25px 0;
+}
+
+.mobile-info-card {
+  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
+  border: 2px solid #4285f4;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 15px;
+}
+
+.mobile-info-card h4 {
+  color: #1557b0;
+  margin-bottom: 12px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.mobile-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.mobile-info-list li {
+  color: #202124;
+  margin: 8px 0;
+  line-height: 1.4;
+  font-size: 0.85em;
+  font-weight: 400;
+}
+
+.mobile-info-list i { 
+  color: #28a745; 
+  margin-right: 10px; 
+}
+
+.mobile-time-estimate {
+  text-align: center;
+  padding: 12px;
+  background: linear-gradient(145deg, #fef7cd 0%, #fdd835 100%);
+  border-radius: 10px;
+  border: 2px solid #fbbc04;
+}
+
+.mobile-time-estimate p {
+  color: #ea8600;
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+.mobile-access-btn,
+.mobile-otp-send-btn {
+  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Poppins', sans-serif;
+  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.mobile-access-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 15px;
+  margin-bottom: 25px;
+}
+
+.mobile-otp-send-btn {
+  padding: 14px 18px;
+  font-size: 13px;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.mobile-access-btn:hover:not(:disabled),
+.mobile-otp-send-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
+}
+
+.mobile-access-btn:disabled,
+.mobile-otp-send-btn:disabled {
+  background: #a6c4fa;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.mobile-secondary-btn {
+  background: none;
+  border: 2px solid #4285f4;
+  color: #4285f4;
+  padding: 12px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+}
+
+.mobile-secondary-btn:hover {
+  background: #4285f4;
+  color: white;
+}
+
+.mobile-account-toggle {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.mobile-account-toggle p {
+  color: #5f6368;
+  font-size: 0.9em;
+  margin-bottom: 0;
+}
+
+.mobile-account-link {
+  background: none;
+  border: none;
+  color: #4285f4;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-decoration: underline;
+  font-family: 'Poppins', sans-serif;
+}
+
+.mobile-account-link:hover {
+  text-decoration: none;
+  color: #1a73e8;
+}
+
+.mobile-error {
+  background: linear-gradient(145deg, #fce8e6 0%, #fad2cf 100%);
+  color: #d93025;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 2px solid #ea4335;
+  font-weight: 500;
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9em;
+}
+
+/* Loading Spinner */
+.mobile-loading-spinner {
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.mobile-footer {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  padding: 15px 25px;
+  border-top: 1px solid rgba(66, 133, 244, 0.2);
+  position: relative;
+  z-index: 10;
+  text-align: center;
+}
+
+.mobile-footer p {
+  color: #5f6368;
+  font-size: 0.8em;
+  margin: 0;
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .mobile-content {
+    padding: 15px;
+  }
+  .mobile-card {
+    max-width: 90%;
+    padding: 35px 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-header {
+    padding: 12px 15px;
+  }
+  .mobile-logo {
+    width: 45px;
+    height: 45px;
+    font-size: 1.2em;
+  }
+  .mobile-title h1 {
+    font-size: 1.6em;
+  }
+  .mobile-content {
+    padding: 10px;
+  }
+  .mobile-card {
+    max-width: 95%;
+    padding: 30px 25px;
+    border-radius: 16px;
+  }
+  .mobile-patient-btn {
+    padding: 15px 12px;
+    min-height: 70px;
+  }
+  .mobile-patient-btn .icon {
+    width: 45px;
+    height: 45px;
+    font-size: 1.8em;
+    margin-right: 12px;
+  }
+  .mobile-contact-group {
+    flex-direction: row;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .mobile-otp-send-btn {
+    width: 110px;
+    min-width: 110px;
+    font-size: 12px;
+    padding: 12px 8px;
+  }
+}
