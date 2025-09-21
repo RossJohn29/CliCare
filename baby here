@@ -1,3268 +1,1594 @@
-  // server.js
-  const express = require('express');
-  const cors = require('cors');
-  const helmet = require('helmet');
-  const rateLimit = require('express-rate-limit');
-  const jwt = require('jsonwebtoken');
-  const bcrypt = require('bcryptjs');
-  const { createClient } = require('@supabase/supabase-js');
-  const nodemailer = require('nodemailer');
-  const axios = require('axios');
-  const QRCode = require('qrcode');
-  const multer = require('multer');
-  const fs = require('fs');
-  const path = require('path');
-  require('dotenv').config();
+// healthcaredashboard.js - CLICARE Healthcare Dashboard Component (Doctor Only)
+import React, { useState, useEffect } from 'react';
+import './healthcaredashboard.css';
 
-
-  const app = express();
-  const PORT = process.env.PORT || 5000;
-
-
-  // Environment Configuration
-  const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-  const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this';
-
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-
-  const emailConfig = {
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  };
-
-
-  const ITEXMO_CONFIG = {
-    apiKey: process.env.ITEXMO_API_KEY,
-    senderId: process.env.ITEXMO_SENDER_ID || 'CLICARE',
-    apiUrl: 'https://www.itexmo.com/php_api/api.php'
-  };
-
-
-  const isSMSConfigured = ITEXMO_CONFIG.apiKey && ITEXMO_CONFIG.apiKey !== 'PR-SAMPL123456_ABCDE';
-
-
-  // In-Memory Store for Rate Limiting
-  const failedAttempts = new Map();
-
-
-  // Rate Limiting Functions
-  const checkAccountRateLimit = (identifier) => {
-    const now = Date.now();
-    const windowMs = 15 * 60 * 1000;
-    const maxAttempts = 5;
+const validateHealthcareToken = async () => {
+  const token = localStorage.getItem('healthcareToken');
+  if (!token) return false;
   
-    if (!failedAttempts.has(identifier)) {
-      failedAttempts.set(identifier, []);
-    }
-  
-    const attempts = failedAttempts.get(identifier);
-    const recentAttempts = attempts.filter(timestamp => now - timestamp < windowMs);
-    failedAttempts.set(identifier, recentAttempts);
-  
-    if (recentAttempts.length >= maxAttempts) {
-      const oldestAttempt = Math.min(...recentAttempts);
-      const timeLeft = windowMs - (now - oldestAttempt);
-      const minutesLeft = Math.ceil(timeLeft / 60000);
-    
-      throw new Error(`Too many failed login attempts for this account. Try again in ${minutesLeft} minutes.`);
-    }
-  };
-
-
-  const recordFailedAttempt = (identifier) => {
-    if (!failedAttempts.has(identifier)) {
-      failedAttempts.set(identifier, []);
-    }
-  
-    const attempts = failedAttempts.get(identifier);
-    attempts.push(Date.now());
-    failedAttempts.set(identifier, attempts);
-  };
-
-
-  const clearFailedAttempts = (identifier) => {
-    failedAttempts.delete(identifier);
-  };
-
-
-  // Utility Functions
-  const generateOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
-
-  const hashPassword = async (password) => {
-    const saltRounds = 12;
-    return await bcrypt.hash(password, saltRounds);
-  };
-
-
-  const verifyPassword = async (password, hashedPassword) => {
-    return await bcrypt.compare(password, hashedPassword);
-  };
-
-
-  // Email Service
-  const sendEmailOTP = async (email, otp, patientName) => {
-    try {
-      const transporter = nodemailer.createTransport(emailConfig);
-      await transporter.verify();
-    
-      const mailOptions = {
-        from: emailConfig.auth.user,
-        to: email,
-        subject: 'CLICARE - Your Verification Code',
-        html: `
-          <div style="font-family: Poppins, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">🏥 CliCare Verification Code</h2>
-            <p>Hello ${patientName},</p>
-            <p>Your verification code is:</p>
-            <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 20px 0;">
-              ${otp}
-            </div>
-            <p><strong>This code will expire in 5 minutes.</strong></p>
-            <p>If you didn't request this code, please ignore this email.</p>
-            <hr>
-            <p><small>CliCare Hospital Management System</small></p>
-          </div>
-        `
-      };
-
-
-      const result = await transporter.sendMail(mailOptions);
-      return result;
-    
-    } catch (error) {
-      throw new Error(`Failed to send email: ${error.message}`);
-    }
-  };
-
-
-  // SMS Service
-  const sendSMSOTP = async (phoneNumber, otp, patientName) => {
-    try {
-      if (!isSMSConfigured) {
-        throw new Error('SMS service not configured. Please contact administrator.');
+  try {
+    const response = await fetch('http://localhost:5000/api/healthcare/profile', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       }
-    
-      let formattedPhone = phoneNumber.toString().trim();
-    
-      if (formattedPhone.startsWith('+639')) {
-        formattedPhone = '0' + formattedPhone.substring(3);
-      } else if (formattedPhone.startsWith('639')) {
-        formattedPhone = '0' + formattedPhone.substring(2);
-      }
-    
-      if (!/^09\d{9}$/.test(formattedPhone)) {
-        throw new Error('Invalid Philippine mobile number format');
-      }
-    
-      const message = `CLICARE: Your verification code is ${otp}. Valid for 5 minutes. Do not share this code.`;
-    
-      const params = {
-        '1': formattedPhone,
-        '2': message,
-        '3': ITEXMO_CONFIG.apiKey,
-        passwd: ITEXMO_CONFIG.apiKey.split('_')[1] || 'default'
-      };
-    
-      const response = await axios.post(ITEXMO_CONFIG.apiUrl, new URLSearchParams(params), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        timeout: 30000
-      });
-    
-      if (response.data && response.data.toString().trim() === '0') {
-        return {
-          success: true,
-          messageId: 'itexmo_' + Date.now(),
-          provider: 'iTexMo'
-        };
-      } else {
-        const errorCodes = {
-          '1': 'Incomplete parameters',
-          '2': 'Invalid number',
-          '3': 'Invalid API key',
-          '4': 'Maximum SMS per day reached',
-          '5': 'Maximum SMS per hour reached',
-          '10': 'Duplicate message',
-          '15': 'Invalid message',
-          '16': 'SMS contains spam words'
-        };
-      
-        const errorCode = response.data.toString().trim();
-        const errorMessage = errorCodes[errorCode] || `Unknown error (${errorCode})`;
-      
-        throw new Error(`SMS sending failed: ${errorMessage}`);
-      }
-    
-    } catch (error) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('SMS service timeout. Please try again.');
-      } else if (error.response) {
-        throw new Error(`SMS service error: ${error.response.data || error.response.status}`);
-      } else if (error.message.includes('Network Error')) {
-        throw new Error('Network error. Please check your internet connection.');
-      } else {
-        throw new Error(error.message || 'Failed to send SMS');
-      }
-    }
-  };
-
-
-
-
-  // Configure multer for file uploads
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const uploadPath = path.join(__dirname, 'uploads', 'lab-results');
-      cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-      const timestamp = Date.now();
-      const originalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      cb(null, `${timestamp}_${originalName}`);
-    }
-  });
-
-
-  const upload = multer({
-    storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-    fileFilter: (req, file, cb) => {
-      const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx/;
-      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-      const mimetype = allowedTypes.test(file.mimetype);
-
-
-      if (extname && mimetype) {
-        return cb(null, true);
-      } else {
-        cb(new Error('Only images and documents are allowed!'));
-      }
-    }
-  });
-
-
-  const uploadDir = path.join(__dirname, 'uploads', 'lab-results');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-  console.log('✅ Upload directory created:', uploadDir);
-}
-
-
-
-
-  // Middleware
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"]
-      }
-    }
-  }));
-
-
-  app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-      ? ['https://your-frontend-domain.com']
-      : ['http://localhost:3000', 'http://127.0.0.1:3000', 'file://', '*'],
-    credentials: true
-  }));
-
-
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-
-  // Rate Limiters
-  const generalLoginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 50,
-    message: {
-      error: 'Too many requests from this network. Please try again later.',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-
-  // Update your general limiter
-  const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200, // Increased from 100
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-
-  app.use('/api/', generalLimiter);
-
-
-  // JWT Authentication Middleware
-  const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-
-    if (!token) {
-      return res.status(401).json({ error: 'Access token required' });
-    }
-
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-      if (err) {
-        return res.status(403).json({ error: 'Invalid or expired token' });
-      }
-      req.user = user;
-      next();
     });
-  };
-
-
-  // Routes
-
-
-  // Healthcare Provider Login
-  app.post('/api/healthcare/login', generalLoginLimiter, async (req, res) => {
-    try {
-      const { staffId, password } = req.body;
-
-
-      if (!staffId || !password) {
-        return res.status(400).json({
-          error: 'Staff ID and password are required'
-        });
-      }
-
-
-      try {
-        checkAccountRateLimit(`healthcare:${staffId.toLowerCase()}`);
-      } catch (rateLimitError) {
-        return res.status(429).json({
-          error: rateLimitError.message
-        });
-      }
-
-
-      const { data: staffData, error: staffError } = await supabase
-        .from('healthStaff')
-        .select('*')
-        .eq('staff_id', staffId)
-        .single();
-
-
-      if (staffError || !staffData) {
-        recordFailedAttempt(`healthcare:${staffId.toLowerCase()}`);
-        return res.status(404).json({
-          error: 'Healthcare Provider ID not found'
-        });
-      }
-
-
-      let isValidPassword = false;
-    
-      if (staffData.password === password) {
-        isValidPassword = true;
-      } else {
-        try {
-          isValidPassword = await verifyPassword(password, staffData.password);
-        } catch (error) {
-          console.log('Bcrypt comparison failed:', error.message);
-        }
-      }
-    
-      if (!isValidPassword) {
-        recordFailedAttempt(`healthcare:${staffId.toLowerCase()}`);
-        return res.status(401).json({
-          error: 'Incorrect password'
-        });
-      }
-
-
-      clearFailedAttempts(`healthcare:${staffId.toLowerCase()}`);
-
-
-      const token = jwt.sign(
-        {
-          id: staffData.id,
-          staff_id: staffData.staff_id,
-          name: staffData.name,
-          role: staffData.role,
-          specialization: staffData.specialization,
-          department_id: staffData.department_id,
-          type: 'healthcare'
-        },
-        JWT_SECRET,
-        { expiresIn: '8h' }
-      );
-
-
-      const { password: _, ...staffInfo } = staffData;
-    
-      res.status(200).json({
-        success: true,
-        token,
-        staff: staffInfo,
-        message: 'Login successful'
-      });
-
-
-    } catch (error) {
-      console.error('Healthcare login error:', error);
-      res.status(500).json({
-        error: 'Internal server error during login'
-      });
-    }
-  });
-
-
-  // Admin Login
-  app.post('/api/admin/login', generalLoginLimiter, async (req, res) => {
-    try {
-      const { healthadminid, password } = req.body;
-
-
-      if (!healthadminid || !password) {
-        return res.status(400).json({
-          error: 'Admin ID and password are required'
-        });
-      }
-
-
-      try {
-        checkAccountRateLimit(`admin:${healthadminid.toLowerCase()}`);
-      } catch (rateLimitError) {
-        return res.status(429).json({
-          error: rateLimitError.message
-        });
-      }
-
-
-      const { data: adminData, error: adminError } = await supabase
-        .from('healthAdmin')
-        .select('*')
-        .eq('healthadmin_id', healthadminid)
-        .single();
-
-
-      if (adminError || !adminData) {
-        recordFailedAttempt(`admin:${healthadminid.toLowerCase()}`);
-        return res.status(401).json({
-          error: 'Invalid credentials'
-        });
-      }
-
-
-      let isValidPassword = false;
-    
-      if (adminData.password === password) {
-        isValidPassword = true;
-      } else {
-        try {
-          isValidPassword = await verifyPassword(password, adminData.password);
-        } catch (error) {
-          console.log('Bcrypt comparison failed:', error.message);
-        }
-      }
-    
-      if (!isValidPassword) {
-        recordFailedAttempt(`admin:${healthadminid.toLowerCase()}`);
-        return res.status(401).json({
-          error: 'Invalid credentials'
-        });
-      }
-
-
-      clearFailedAttempts(`admin:${healthadminid.toLowerCase()}`);
-
-
-      const token = jwt.sign(
-        {
-          id: adminData.id,
-          healthadmin_id: adminData.healthadmin_id,
-          name: adminData.name,
-          position: adminData.position,
-          type: 'admin'
-        },
-        JWT_SECRET,
-        { expiresIn: '8h' }
-      );
-
-
-      const { password: _, ...adminInfo } = adminData;
-    
-      res.status(200).json({
-        success: true,
-        token,
-        admin: adminInfo,
-        message: 'Login successful'
-      });
-
-
-    } catch (error) {
-      console.error('Admin login error:', error);
-      res.status(500).json({
-        error: 'Internal server error during login'
-      });
-    }
-  });
-
-
-  // Send OTP to Outpatient
-  app.post('/api/outpatient/send-otp', generalLoginLimiter, async (req, res) => {
-    try {
-      const { patientId, contactInfo, contactType } = req.body;
-
-
-      if (!patientId || !contactInfo || !contactType) {
-        return res.status(400).json({
-          error: 'Patient ID, contact information, and contact type are required'
-        });
-      }
-
-
-      if (!['email', 'phone'].includes(contactType)) {
-        return res.status(400).json({
-          error: 'Contact type must be email or phone'
-        });
-      }
-
-
-      if (contactType === 'phone' && !isSMSConfigured) {
-        return res.status(400).json({
-          error: 'SMS verification is not configured. Please use email verification or contact support.'
-        });
-      }
-
-
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .select('*')
-        .eq('patient_id', patientId.toUpperCase())
-        .single();
-
-
-      if (patientError || !patientData) {
-        return res.status(404).json({
-          error: 'Patient ID not found. Please check your Patient ID.'
-        });
-      }
-
-
-      const dbContactInfo = contactType === 'email'
-        ? patientData.email
-        : patientData.contact_no;
-      
-      if (dbContactInfo !== contactInfo) {
-        return res.status(400).json({
-          error: `The ${contactType} doesn't match our records for this Patient ID`
-        });
-      }
-
-
-      await supabase
-        .from('otpVerification')
-        .delete()
-        .eq('patient_id', patientId.toUpperCase())
-        .eq('contact_info', contactInfo);
-
-
-      const otp = generateOTP();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-
-      const { data: otpRecord, error: otpError } = await supabase
-        .from('otpVerification')
-        .insert({
-          patient_id: patientId.toUpperCase(),
-          contact_info: contactInfo,
-          contact_type: contactType,
-          otp_code: otp,
-          expires_at: expiresAt.toISOString()
-        })
-        .select()
-        .single();
-
-
-      if (otpError) {
-        return res.status(500).json({
-          error: 'Failed to generate verification code'
-        });
-      }
-
-
-      try {
-        if (contactType === 'email') {
-          await sendEmailOTP(contactInfo, otp, patientData.name);
-          res.status(200).json({
-            success: true,
-            message: 'Verification code sent to your email',
-            expiresIn: 300
-          });
-        } else if (contactType === 'phone') {
-          await sendSMSOTP(contactInfo, otp, patientData.name);
-          res.status(200).json({
-            success: true,
-            message: 'Verification code sent to your phone',
-            expiresIn: 300,
-            provider: 'iTexMo'
-          });
-        }
-      } catch (sendError) {
-        await supabase
-          .from('otpVerification')
-          .delete()
-          .eq('id', otpRecord.id);
-
-
-        return res.status(500).json({
-          error: `Failed to send verification code via ${contactType}. Please try again.`,
-          details: sendError.message
-        });
-      }
-
-
-    } catch (error) {
-      console.error('Send OTP error:', error);
-      res.status(500).json({
-        error: 'Internal server error',
-        details: error.message
-      });
-    }
-  });
-
-
-  // Verify OTP and Login
-  app.post('/api/outpatient/verify-otp', generalLoginLimiter, async (req, res) => {
-    try {
-      const { patientId, contactInfo, otp, deviceType } = req.body;
-
-
-      if (!patientId || !contactInfo || !otp) {
-        return res.status(400).json({
-          error: 'Patient ID, contact info, and OTP are required'
-        });
-      }
-
-
-      const { data: otpData, error: otpError } = await supabase
-        .from('otpVerification')
-        .select('*')
-        .eq('patient_id', patientId.toUpperCase())
-        .eq('contact_info', contactInfo)
-        .eq('is_verified', false)
-        .gte('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-
-      if (otpError || !otpData) {
-        return res.status(400).json({
-          error: 'Invalid or expired verification code'
-        });
-      }
-
-
-      if (otpData.otp_code !== otp) {
-        await supabase
-          .from('otpVerification')
-          .update({ attempts: otpData.attempts + 1 })
-          .eq('id', otpData.id);
-
-
-        return res.status(400).json({
-          error: 'Invalid verification code'
-        });
-      }
-
-
-      await supabase
-        .from('otpVerification')
-        .update({ is_verified: true })
-        .eq('id', otpData.id);
-
-
-      // Get patient data
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .select('*')
-        .eq('patient_id', patientId.toUpperCase())
-        .single();
-
-
-      if (patientError || !patientData) {
-        return res.status(404).json({
-          error: 'Patient data not found'
-        });
-      }
-
-
-      // Get emergency contact data using the patient's internal ID
-      const { data: emergencyContactData, error: emergencyError } = await supabase
-        .from('emergencyContact')
-        .select('*')
-        .eq('patient_id', patientData.id) // Use the internal ID
-        .single();
-
-
-      if (emergencyError) {
-        console.log('No emergency contact found for patient:', patientData.patient_id);
-      }
-
-
-      const token = jwt.sign(
-        {
-          patientId: patientData.patient_id,
-          type: 'outpatient',
-          loginMethod: otpData.contact_type,
-          deviceType: deviceType || 'unknown'
-        },
-        JWT_SECRET,
-        { expiresIn: '8h' }
-      );
-
-
-      // Include emergency contact data in the response
-      res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        token: token,
-        patient: {
-          patient_id: patientData.patient_id,
-          name: patientData.name,
-          email: patientData.email,
-          contact_no: patientData.contact_no,
-          birthday: patientData.birthday,
-          age: patientData.age,
-          sex: patientData.sex,
-          address: patientData.address,
-          registration_date: patientData.registration_date,
-          // Add emergency contact fields
-          emergency_contact_name: emergencyContactData?.name || '',
-          emergency_contact_relationship: emergencyContactData?.relationship || '',
-          emergency_contact_no: emergencyContactData?.contact_number || ''
-        }
-      });
-
-
-    } catch (error) {
-      console.error('Verify OTP error:', error);
-      res.status(500).json({
-        error: 'Internal server error',
-        details: error.message
-      });
-    }
-  });
-
-
-  // Add department assignment logic function
-  const assignDepartmentBySymptoms = (symptoms) => {
-  const departmentMapping = {
-    // Emergency/High Priority - Cardiology (department_id: 3)
-    'Chest Pain': 3,
-    'Chest Discomfort': 3, 
-    'Heart Palpitations': 3,
-    'High Blood Pressure': 3,
-    'Shortness of Breath': 3,
-    'Irregular Heartbeat': 3,
-    'Seizures': 1, // Emergency
-    'Wounds': 1, // Emergency
-    
-    // Neurological - Internal Medicine (department_id: 2)
-    'Migraine': 2,
-    'Memory Problems': 2,
-    'Numbness': 2,
-    'Tingling': 2,
-    'Balance Issues': 2,
-    
-    // Gastrointestinal - Internal Medicine
-    'Stomach Ache': 2,
-    'Diarrhea': 2,
-    'Constipation': 2,
-    'Heartburn': 2,
-    'Bloating': 2,
-    
-    // General/Internal Medicine (department_id: 2)
-    'Fever': 2,
-    'Headache': 2,
-    'Fatigue': 2,
-    'Body Aches': 2,
-    'Dizziness': 2,
-    'Nausea': 2,
-    'Vomiting': 2,
-    'Loss of Appetite': 2,
-    'Cough': 2,
-    'Sore Throat': 2,
-    'Runny Nose': 2,
-    'Sneezing': 2,
-    'Back Pain': 2,
-    'Joint Pain': 2,
-    'Muscle Cramps': 2,
-    'Neck Pain': 2,
-    'Rash': 2,
-    'Itching': 2,
-    'Skin Discoloration': 2,
-    'Acne': 2,
-    'Hair Loss': 2,
-    'Anxiety': 2,
-    'Depression': 2,
-    'Stress': 2,
-    'Sleep Problems': 2,
-    'Mood Changes': 2,
-    'Vision Problems': 2,
-    'Hearing Loss': 2,
-    'Ear Pain': 2,
-    'Eye Pain': 2,
-    'Discharge': 2,
-    
-    // Women's Health - Internal Medicine
-    'Menstrual Problems': 2,
-    'Pregnancy Concerns': 2,
-    'Menopause Symptoms': 2,
-    'Breast Issues': 2,
-    
-    // Routine Care - Internal Medicine
-    'Annual Check-up': 2,
-    'Health Screening': 2,
-    'Vaccination': 2,
-    'Follow-up Visit': 2,
-    'Lab Test Follow-up': 2,
-    'Prescription Refill': 2
-  };
-  
-  // Find the most critical symptom first
-  for (const symptom of symptoms) {
-    if (departmentMapping[symptom]) {
-      return departmentMapping[symptom];
-    }
+    return response.ok;
+  } catch (error) {
+    return false;
   }
-  
-  return 2; // Default to Internal Medicine
 };
 
-  // Get symptoms endpoint
-app.get('/api/symptoms', async (req, res) => {
-  try {
-    console.log('📋 Fetching symptoms from database...');
-    
-    // Fetch all active symptoms from the database
-    const { data: symptomsData, error: symptomsError } = await supabase
-      .from('symptoms')
-      .select('name, category, department_id, age_group, priority, estimated_wait')
-      .eq('is_active', true)
-      .order('category', { ascending: true })
-      .order('name', { ascending: true });
-
-    if (symptomsError) {
-      console.error('❌ Database error fetching symptoms:', symptomsError);
-      return res.status(500).json({
-        error: 'Failed to fetch symptoms from database',
-        details: symptomsError.message
-      });
-    }
-
-    if (!symptomsData || symptomsData.length === 0) {
-      console.log('⚠️ No symptoms found in database');
-      return res.status(200).json({
-        success: true,
-        symptoms: [],
-        message: 'No symptoms available'
-      });
-    }
-
-    // Group symptoms by category
-    const groupedSymptoms = symptomsData.reduce((acc, symptom) => {
-      const category = symptom.category || 'General';
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push({
-        name: symptom.name,
-        priority: symptom.priority,
-        estimated_wait: symptom.estimated_wait,
-        age_group: symptom.age_group
-      });
-      return acc;
-    }, {});
-
-    // Convert to array format expected by frontend
-    const formattedSymptoms = Object.entries(groupedSymptoms)
-      .map(([category, symptoms]) => ({
-        category,
-        symptoms: symptoms.map(s => s.name), // Frontend expects just the name strings
-        count: symptoms.length,
-        metadata: symptoms // Keep full data for potential future use
-      }))
-      .sort((a, b) => {
-        // Sort categories: General first, then Routine Care last, others alphabetically
-        if (a.category === 'General Symptoms') return -1;
-        if (b.category === 'General Symptoms') return 1;
-        if (a.category === 'Routine Care') return 1;
-        if (b.category === 'Routine Care') return -1;
-        return a.category.localeCompare(b.category);
-      });
-
-    console.log('✅ Symptoms fetched successfully:', formattedSymptoms.length, 'categories');
-    console.log('Categories:', formattedSymptoms.map(cat => `${cat.category} (${cat.count})`));
-
-    res.status(200).json({
-      success: true,
-      symptoms: formattedSymptoms,
-      totalCategories: formattedSymptoms.length,
-      totalSymptoms: symptomsData.length,
-      message: 'Symptoms loaded successfully'
-    });
-
-  } catch (error) {
-    console.error('💥 Error in symptoms endpoint:', error);
-    res.status(500).json({
-      error: 'Internal server error while fetching symptoms',
-      details: error.message
-    });
-  }
-});
-
-
-  // Patient registration endpoint
-  app.post('/api/patient/register', async (req, res) => {
-    try {
-      console.log('📝 Registration request received:', req.body);
-      
-      const {
-        name,
-        birthday,
-        age,
-        sex,
-        address,
-        contact_no,
-        email,
-        emergency_contact_name,
-        emergency_contact_relationship,
-        emergency_contact_no,
-        symptoms // Add symptoms to registration
-      } = req.body;
-
-
-      // Validate required fields
-      if (!name || !birthday || !age || !sex || !address || !contact_no || !email) {
-        console.log('❌ Missing required fields');
-        return res.status(400).json({ 
-          error: 'Missing required fields' 
-        });
-      }
-
-
-      // Generate unique patient ID
-      const patientId = `PAT${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-      console.log('🆔 Generated Patient ID:', patientId);
-
-
-      // Insert into outPatient table
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .insert({
-          patient_id: patientId,
-          name,
-          birthday,
-          age: parseInt(age),
-          sex,
-          address,
-          contact_no,
-          email: email.toLowerCase(),
-          registration_date: new Date().toISOString().split('T')[0]
-        })
-        .select()
-        .single();
-
-
-      if (patientError) {
-        console.error('💥 Patient registration error:', patientError);
-        return res.status(500).json({ 
-          error: 'Patient registration failed',
-          details: patientError.message 
-        });
-      }
-
-
-      // Insert emergency contact if provided
-      if (emergency_contact_name || emergency_contact_relationship || emergency_contact_no) {
-        await supabase
-          .from('emergencyContact')
-          .insert({
-            patient_id: patientData.id,
-            name: emergency_contact_name,
-            contact_number: emergency_contact_no,
-            relationship: emergency_contact_relationship
-          });
-      }
-
-
-      // Create visit record with symptoms and department assignment ONLY if symptoms provided
-      if (symptoms && symptoms.length > 0) {
-        let assignedDepartmentId = assignDepartmentBySymptoms(symptoms);
-        
-        // Override with Pediatrics if patient is under 18
-        if (parseInt(age) < 18) {
-          assignedDepartmentId = 4; // Pediatrics
-        }
-
-
-        const { data: visitData, error: visitError } = await supabase
-          .from('visit')
-          .insert({
-            patient_id: patientData.id,
-            visit_date: new Date().toISOString().split('T')[0],
-            visit_time: new Date().toTimeString().split(' ')[0],
-            appointment_type: 'Walk-in Registration',
-            symptoms: Array.isArray(symptoms) ? symptoms.join(', ') : symptoms
-          })
-          .select()
-          .single();
-
-
-        if (!visitError) {
-          // Generate queue number for the department
-          const { data: existingQueue } = await supabase
-            .from('queue')
-            .select('queue_no')
-            .eq('department_id', assignedDepartmentId)
-            .order('queue_no', { ascending: false })
-            .limit(1);
-
-
-          const nextQueueNo = existingQueue.length > 0 ? existingQueue[0].queue_no + 1 : 1;
-
-
-          // Create queue entry
-          await supabase
-            .from('queue')
-            .insert({
-              visit_id: visitData.visit_id,
-              department_id: assignedDepartmentId,
-              queue_no: nextQueueNo,
-              status: 'waiting'
-            });
-
-
-          // Get department name
-          const { data: departmentData } = await supabase
-            .from('department')
-            .select('name')
-            .eq('department_id', assignedDepartmentId)
-            .single();
-
-
-          console.log(`✅ Patient assigned to ${departmentData?.name || 'Unknown Department'}, Queue #${nextQueueNo}`);
-        }
-      }
-
-
-      console.log('✅ New patient registered:', patientData.name, 'ID:', patientData.patient_id);
-
-
-      res.status(201).json({
-        success: true,
-        patient: patientData,
-        message: 'Patient registered successfully'
-      });
-
-
-    } catch (error) {
-      console.error('💥 Registration error:', error);
-      res.status(500).json({ 
-        error: 'Internal server error',
-        details: error.message 
-      });
-    }
+const HealthcareDashboard = () => {
+  const [currentPage, setCurrentPage] = useState('overview');
+  const [staffInfo, setStaffInfo] = useState({
+    staffId: '',
+    name: '',
+    role: '',
+    department: '',
+    staffType: ''
+  });
+  const [dashboardData, setDashboardData] = useState({
+    todayStats: {
+      myPatients: 0,
+      labResults: 0
+    },
+    recentActivity: [],
+    patientQueue: [],
+    notifications: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [patientQueue, setPatientQueue] = useState([]);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [myPatients, setMyPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [patientHistory, setPatientHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [overallPatients, setOverallPatients] = useState([]);
+  const [selectedPatientModal, setSelectedPatientModal] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [overallLoading, setOverallLoading] = useState(false);
+  const [totalPatients, setTotalPatients] = useState(0);
+  const [historyPagination, setHistoryPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalVisits: 0,
+    hasNextPage: false
+  });
+  const [labRequests, setLabRequests] = useState([]);
+  const [labResults, setLabResults] = useState([]);
+  const [showLabRequestModal, setShowLabRequestModal] = useState(false);
+  const [selectedPatientForLab, setSelectedPatientForLab] = useState(null);
+  const [labRequestForm, setLabRequestForm] = useState({
+    test_name: '',
+    test_type: '',
+    priority: 'normal',
+    instructions: '',
+    due_date: ''
   });
 
+  // New state variables for enhanced lab orders
+  const [activeLabTab, setActiveLabTab] = useState('all');
+  const [allLabData, setAllLabData] = useState([]);
+  const [labDataLoading, setLabDataLoading] = useState(false);
 
-  // Get all patients consulted by the current doctor's department
-  app.get('/api/healthcare/all-patients', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'healthcare') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      // Get doctor's department
-      const { data: staffData } = await supabase
-        .from('healthStaff')
-        .select('department_id, specialization')
-        .eq('id', req.user.id)
-        .single();
-
-
-      if (!staffData) {
-        return res.status(404).json({ error: 'Staff not found' });
-      }
-
-
-      // Get all unique patients who have visited this doctor's department
-      const { data: patientsData, error: patientsError } = await supabase
-        .from('queue')
-        .select(`
-          visit!inner(
-            patient_id,
-            outPatient!inner(
-              id,
-              patient_id,
-              name,
-              birthday,
-              age,
-              sex,
-              address,
-              contact_no,
-              email,
-              registration_date
-            )
-          )
-        `)
-        .eq('department_id', staffData.department_id)
-        .order('created_time', { ascending: false });
-
-
-      if (patientsError) {
-        console.error('All patients fetch error:', patientsError);
-        return res.status(500).json({ error: 'Failed to fetch patients' });
-      }
-
-
-      // Remove duplicates based on patient_id
-      const uniquePatients = [];
-      const seenPatientIds = new Set();
-
-
-      patientsData.forEach(item => {
-        const patient = item.visit.outPatient;
-        if (!seenPatientIds.has(patient.patient_id)) {
-          seenPatientIds.add(patient.patient_id);
-          uniquePatients.push({
-            id: patient.id,
-            patient_id: patient.patient_id,
-            name: patient.name,
-            birthday: patient.birthday,
-            age: patient.age,
-            sex: patient.sex,
-            address: patient.address,
-            contact_no: patient.contact_no,
-            email: patient.email,
-            registration_date: patient.registration_date
-          });
-        }
-      });
-
-
-      res.status(200).json({
-        success: true,
-        patients: uniquePatients,
-        totalCount: uniquePatients.length,
-        department: {
-          id: staffData.department_id,
-          specialization: staffData.specialization
-        }
-      });
-
-
-    } catch (error) {
-      console.error('All patients error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+  // Helper functions for lab data
+  const getFilteredLabData = () => {
+    switch (activeLabTab) {
+      case 'pending':
+        return allLabData.filter(item => item.status === 'pending');
+      case 'completed':
+        return allLabData.filter(item => item.status === 'completed' && item.hasResult);
+      default:
+        return allLabData;
     }
-  });
-
-
-  // Get detailed patient information for modal
-  app.get('/api/healthcare/patient-details/:patientId', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'healthcare') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { patientId } = req.params;
-
-
-      // Get doctor's department for security check
-      const { data: staffData } = await supabase
-        .from('healthStaff')
-        .select('department_id')
-        .eq('id', req.user.id)
-        .single();
-
-
-      if (!staffData) {
-        return res.status(404).json({ error: 'Staff not found' });
-      }
-
-
-      // First check if patient has visited this doctor's department
-      const { data: visitCheck } = await supabase
-        .from('queue')
-        .select(`
-          visit!inner(
-            outPatient!inner(patient_id)
-          )
-        `)
-        .eq('department_id', staffData.department_id)
-        .eq('visit.outPatient.patient_id', patientId)
-        .limit(1);
-
-
-      if (!visitCheck || visitCheck.length === 0) {
-        return res.status(403).json({ error: 'Patient has not visited your department' });
-      }
-
-
-      // Get complete patient details
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .select(`
-          *,
-          emergencyContact(
-            name,
-            contact_number,
-            relationship
-          )
-        `)
-        .eq('patient_id', patientId)
-        .single();
-
-
-      if (patientError || !patientData) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
-
-
-      res.status(200).json({
-        success: true,
-        patient: patientData
-      });
-
-
-    } catch (error) {
-      console.error('Patient details error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Modify the existing fetchMyPatients to only show completed consultations by this doctor
-  app.get('/api/healthcare/my-patients', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'healthcare') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { date } = req.query;
-      const today = new Date().toISOString().split('T')[0];
-      const filterDate = date || today;
-
-
-      // Get doctor's department
-      const { data: staffData } = await supabase
-        .from('healthStaff')
-        .select('department_id, specialization')
-        .eq('id', req.user.id)
-        .single();
-
-
-      if (!staffData) {
-        return res.status(404).json({ error: 'Staff not found' });
-      }
-
-
-      // Get patients who have COMPLETED consultation with this doctor
-      const { data: patientsData, error: patientsError } = await supabase
-        .from('diagnosis')
-        .select(`
-          healthstaff_id,
-          visit!inner(
-            visit_id,
-            visit_date,
-            visit_time,
-            symptoms,
-            appointment_type,
-            outPatient!inner(
-              id,
-              patient_id,
-              name,
-              age,
-              sex,
-              contact_no,
-              email
-            ),
-            queue!inner(
-              status,
-              department_id
-            )
-          )
-        `)
-        .eq('healthstaff_id', req.user.id) // Only patients diagnosed by this doctor
-        .eq('visit.visit_date', filterDate) // Filter by specific date
-        .eq('visit.queue.department_id', staffData.department_id) // Ensure correct department
-        .eq('visit.queue.status', 'completed') // Only completed consultations
-        .order('created_at', { ascending: false });
-
-
-      if (patientsError) {
-        console.error('Patients fetch error:', patientsError);
-        return res.status(500).json({ error: 'Failed to fetch patients' });
-      }
-
-
-      // Remove duplicates and format data
-      const uniquePatients = [];
-      const seenPatientIds = new Set();
-
-
-      patientsData.forEach(item => {
-        const patientId = item.visit.outPatient.patient_id;
-        if (!seenPatientIds.has(patientId)) {
-          seenPatientIds.add(patientId);
-          uniquePatients.push({
-            patient_id: patientId,
-            name: item.visit.outPatient.name,
-            age: item.visit.outPatient.age,
-            sex: item.visit.outPatient.sex,
-            contact_no: item.visit.outPatient.contact_no,
-            email: item.visit.outPatient.email,
-            lastVisit: item.visit.visit_date,
-            lastSymptoms: item.visit.symptoms,
-            queueStatus: 'completed'
-          });
-        }
-      });
-
-
-      res.status(200).json({
-        success: true,
-        patients: uniquePatients,
-        department: {
-          id: staffData.department_id,
-          specialization: staffData.specialization
-        }
-      });
-
-
-    } catch (error) {
-      console.error('My patients error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Get patient history for healthcare dashboard (without lab results)
-  app.get('/api/healthcare/patient-history/:patientId', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'healthcare') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { patientId } = req.params;
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-
-
-      // Get patient basic info
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .select(`
-          id,
-          patient_id,
-          name,
-          birthday,
-          age,
-          sex,
-          address,
-          contact_no,
-          email,
-          registration_date,
-          emergencyContact(
-            name,
-            contact_number,
-            relationship
-          )
-        `)
-        .eq('patient_id', patientId)
-        .single();
-
-
-      if (patientError || !patientData) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
-
-
-      // Get visit history with pagination (no lab results)
-      const { data: visitHistory, error: visitError } = await supabase
-        .from('visit')
-        .select(`
-          visit_id,
-          visit_date,
-          visit_time,
-          appointment_type,
-          symptoms,
-          diagnosis(
-            diagnosis_id,
-            diagnosis_description,
-            diagnosis_type,
-            severity,
-            notes,
-            healthStaff(
-              name,
-              specialization
-            )
-          ),
-          queue(
-            queue_no,
-            status,
-            department(
-              name
-            )
-          )
-        `)
-        .eq('patient_id', patientData.id)
-        .order('visit_date', { ascending: false })
-        .order('visit_time', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-
-      if (visitError) {
-        console.error('Visit history error:', visitError);
-        return res.status(500).json({ error: 'Failed to fetch visit history' });
-      }
-
-
-      // Get total count for pagination
-      const { count: totalVisits } = await supabase
-        .from('visit')
-        .select('*', { count: 'exact', head: true })
-        .eq('patient_id', patientData.id);
-
-
-      res.status(200).json({
-        success: true,
-        patient: patientData,
-        visitHistory: visitHistory || [],
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(totalVisits / limit),
-          totalVisits: totalVisits || 0,
-          hasNextPage: (page * limit) < totalVisits
-        }
-      });
-
-
-    } catch (error) {
-      console.error('Patient history error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Get patient queue for healthcare dashboard
-  app.get('/api/healthcare/patient-queue', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'healthcare') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      // Get doctor's department
-      const { data: staffData } = await supabase
-        .from('healthStaff')
-        .select('department_id, specialization')
-        .eq('id', req.user.id)
-        .single();
-
-
-      if (!staffData) {
-        return res.status(404).json({ error: 'Staff not found' });
-      }
-
-
-      // Get patients in queue for this department
-      const { data: queueData, error: queueError } = await supabase
-        .from('queue')
-        .select(`
-          queue_id,
-          queue_no,
-          status,
-          created_time,
-          visit!inner(
-            visit_id,
-            symptoms,
-            visit_date,
-            visit_time,
-            appointment_type,
-            outPatient!inner(
-              patient_id,
-              name,
-              age,
-              sex,
-              contact_no
-            )
-          ),
-          department!inner(
-            name
-          )
-        `)
-        .eq('department_id', staffData.department_id)
-        .in('status', ['waiting', 'in_progress'])
-        .order('queue_no', { ascending: true });
-
-
-      if (queueError) {
-        console.error('Queue fetch error:', queueError);
-        return res.status(500).json({ error: 'Failed to fetch queue' });
-      }
-
-
-      // Get today's stats
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { data: todayVisits } = await supabase
-        .from('visit')
-        .select('visit_id, outPatient!inner(patient_id)')
-        .eq('visit_date', today);
-
-
-      const { data: labResults } = await supabase
-        .from('labResult')
-        .select('result_id')
-        .eq('upload_date', today);
-
-
-      res.status(200).json({
-        success: true,
-        queue: queueData || [],
-        todayStats: {
-          myPatients: todayVisits?.length || 0,
-          labResults: labResults?.length || 0
-        },
-        department: {
-          id: staffData.department_id,
-          specialization: staffData.specialization
-        }
-      });
-
-
-    } catch (error) {
-      console.error('Patient queue error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Update the existing queue status endpoint
-app.patch('/api/healthcare/queue/:queueId/status', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { queueId } = req.params;
-    const { status, diagnosis_description, diagnosis_code, severity, notes } = req.body;
-
-
-    if (!['waiting', 'in_progress', 'completed'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
-    }
-
-
-    // Get queue data with visit and patient info
-    const { data: queueData, error: queueFetchError } = await supabase
-      .from('queue')
-      .select(`
-        *,
-        visit!inner(
-          visit_id,
-          patient_id,
-          outPatient!inner(id, patient_id)
-        )
-      `)
-      .eq('queue_id', queueId)
-      .single();
-
-
-    if (queueFetchError || !queueData) {
-      return res.status(404).json({ error: 'Queue entry not found' });
-    }
-
-
-    // Update queue status
-    const { data: updatedQueue, error: updateError } = await supabase
-      .from('queue')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('queue_id', queueId)
-      .select()
-      .single();
-
-
-    if (updateError) {
-      return res.status(500).json({ error: 'Failed to update queue status' });
-    }
-
-
-    let diagnosisData = null;
-    let medicalRecordData = null;
-
-
-    // If marking as completed and diagnosis info provided, create records
-    if (status === 'completed' && diagnosis_description) {
-      // Create diagnosis
-      const { data: newDiagnosis, error: diagnosisError } = await supabase
-        .from('diagnosis')
-        .insert({
-          visit_id: queueData.visit.visit_id,
-          patient_id: queueData.visit.outPatient.id,
-          healthstaff_id: req.user.id,
-          diagnosis_code: diagnosis_code || 'Z00.00',
-          diagnosis_description,
-          diagnosis_type: 'primary',
-          severity: severity || 'moderate',
-          notes: notes || ''
-        })
-        .select()
-        .single();
-
-
-      if (!diagnosisError) {
-        diagnosisData = newDiagnosis;
-
-
-        // Create medical record
-        const { data: newMedicalRecord, error: medicalRecordError } = await supabase
-          .from('medicalRecord')
-          .insert({
-            patient_id: queueData.visit.outPatient.id,
-            visit_id: queueData.visit.visit_id,
-            result_id: null
-          })
-          .select()
-          .single();
-
-
-        if (!medicalRecordError) {
-          medicalRecordData = newMedicalRecord;
-        } else {
-          console.warn('Medical record creation failed:', medicalRecordError);
-        }
-      } else {
-        console.warn('Diagnosis creation failed:', diagnosisError);
-      }
-    }
-
-
-    res.status(200).json({
-      success: true,
-      queue: updatedQueue,
-      diagnosis: diagnosisData,
-      medicalRecord: medicalRecordData,
-      message: 'Queue status updated successfully'
-    });
-
-
-  } catch (error) {
-    console.error('Update queue status error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-  // Visit/Appointment booking endpoint
-  app.post('/api/patient/visit', async (req, res) => {
-    try {
-      console.log('📅 Visit booking request:', req.body);
-      
-      const {
-        patient_id,
-        symptoms,
-        duration,
-        severity,
-        previous_treatment,
-        allergies,
-        medications,
-        appointment_type
-      } = req.body;
-
-
-      if (!patient_id || !symptoms) {
-        return res.status(400).json({ 
-          error: 'Patient ID and symptoms are required' 
-        });
-      }
-
-
-      // Find patient first
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .select('id, patient_id, name')
-        .eq('patient_id', patient_id)
-        .single();
-
-
-      if (patientError || !patientData) {
-        console.log('❌ Patient not found:', patient_id);
-        return res.status(404).json({ 
-          error: 'Patient not found' 
-        });
-      }
-
-
-      // Create visit record
-      const { data: visitData, error: visitError } = await supabase
-        .from('visit')
-        .insert({
-          patient_id: patientData.id,
-          visit_date: new Date().toISOString().split('T')[0],
-          visit_time: new Date().toTimeString().split(' ')[0],
-          appointment_type: appointment_type || 'Walk-in',
-          symptoms: symptoms
-        })
-        .select()
-        .single();
-
-
-      if (visitError) {
-        console.error('💥 Visit creation error:', visitError);
-        return res.status(500).json({ 
-          error: 'Failed to create visit record',
-          details: visitError.message 
-        });
-      }
-
-
-      // Create queue entry
-      const queueNumber = Math.floor(Math.random() * 100) + 1;
-      
-      const { data: queueData, error: queueError } = await supabase
-        .from('queue')
-        .insert({
-          visit_id: visitData.visit_id,
-          department_id: 2,
-          queue_no: queueNumber,
-          status: 'waiting'
-        })
-        .select()
-        .single();
-
-
-      console.log('✅ Visit created for:', patientData.name);
-
-
-      res.status(201).json({
-        success: true,
-        visit: visitData,
-        queue_number: queueData?.queue_no || queueNumber,
-        department: 'Internal Medicine',
-        estimated_wait: '15-30 minutes',
-        message: 'Appointment booked successfully'
-      });
-
-
-    } catch (error) {
-      console.error('💥 Visit booking error:', error);
-      res.status(500).json({ 
-        error: 'Internal server error',
-        details: error.message 
-      });
-    }
-  });
-
-
-  // Get Healthcare Provider Profile
-  app.get('/api/healthcare/profile', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'healthcare') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { data: staffData, error } = await supabase
-        .from('healthStaff')
-        .select('id, staff_id, name, role, specialization, department_id, license_no, contact_no')
-        .eq('id', req.user.id)
-        .single();
-
-
-      if (error || !staffData) {
-        return res.status(404).json({ error: 'Staff not found' });
-      }
-
-
-      res.json(staffData);
-    } catch (error) {
-      console.error('Get healthcare profile error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Get Admin Profile
-  app.get('/api/admin/profile', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'admin') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { data: adminData, error } = await supabase
-        .from('healthAdmin')
-        .select('id, healthadmin_id, name, position')
-        .eq('id', req.user.id)
-        .single();
-
-
-      if (error || !adminData) {
-        return res.status(404).json({
-          error: 'Admin not found'
-        });
-      }
-
-
-      res.status(200).json({
-        success: true,
-        admin: adminData
-      });
-
-
-    } catch (error) {
-      console.error('Get admin profile error:', error);
-      res.status(500).json({
-        error: 'Internal server error'
-      });
-    }
-  });
-
-
-  // Generate unique temp patient ID
-  const generateTempPatientId = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `TEMP${timestamp}${random}`;
   };
 
+  const handleViewFile = (fileUrl, fileName) => {
+    if (fileUrl) {
+      // Ensure proper URL format
+      const fullUrl = fileUrl.startsWith('http') ? fileUrl : `http://localhost:5000${fileUrl}`;
+      window.open(fullUrl, '_blank');
+    } else {
+      alert('File not available');
+    }
+  };
 
-  // POST /api/temp-registration - Create new temporary registration
-  app.post('/api/temp-registration', async (req, res) => {
+  const fetchAllLabData = async () => {
+  setLabDataLoading(true);
+  try {
+    // Fetch both lab requests and results
+    await Promise.all([
+      fetchLabRequests(),
+      fetchLabResults()
+    ]);
+    
+    // After both are fetched, combine lab requests with their results
+    const combinedData = labRequests.map(request => ({
+      ...request,
+      hasResult: request.labResult !== null,
+      resultData: request.labResult || null
+    }));
+    
+    setAllLabData(combinedData);
+  } catch (error) {
+    console.error('Failed to fetch lab data:', error);
+  } finally {
+    setLabDataLoading(false);
+  }
+};
+
+  useEffect(() => {
+  const fetchOverallPatients = async () => {
     try {
-      console.log('📝 Temp registration request:', req.body);
+      setOverallLoading(true);
+      const token = localStorage.getItem('healthcareToken');
       
-      const {
-        name,
-        birthday,
-        age,
-        sex,
-        address,
-        contact_no,
-        email,
-        emergency_contact_name,
-        emergency_contact_relationship,
-        emergency_contact_no,
-        preferred_time,
-        created_date,
-        status,
-        expires_at
-      } = req.body;
-
-
-      // Generate temp patient ID
-      const temp_patient_id = generateTempPatientId();
-
-
-      // Insert into tempReg table
-      const { data: tempRegData, error: tempRegError } = await supabase
-        .from('tempReg')
-        .insert({
-          name,
-          birthday,
-          age: parseInt(age),
-          sex,
-          address,
-          contact_no,
-          email: email.toLowerCase(),
-          emergency_contact_name,
-          emergency_contact_relationship,
-          emergency_contact_no,
-          preferred_time,
-          created_date,
-          status: status || 'pending',
-          expires_at,
-          temp_patient_id
-        })
-        .select()
-        .single();
-
-
-      if (tempRegError) {
-        console.error('💥 Temp registration error:', tempRegError);
-        
-        if (tempRegError.code === '23505') { // Unique constraint violation
-          return res.status(400).json({
-            error: 'Email or contact number already registered. Please use different details.'
-          });
+      const response = await fetch('http://localhost:5000/api/healthcare/all-patients', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         }
-        
-        return res.status(500).json({
-          error: 'Registration failed. Please try again.',
-          details: tempRegError.message
-        });
-      }
-
-
-      console.log('✅ Temp registration created:', tempRegData.name, 'ID:', tempRegData.temp_patient_id);
-
-
-      res.status(201).json({
-        success: true,
-        message: 'Temporary registration created successfully',
-        temp_id: tempRegData.temp_id,
-        temp_patient_id: tempRegData.temp_patient_id
       });
 
+      if (response.ok) {
+        const data = await response.json();
+        setOverallPatients(data.patients || []);
+        setTotalPatients(data.totalCount || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch overall patients:', error);
+    } finally {
+      setOverallLoading(false);
+    }
+  };
+
+  const initializeDashboard = async () => {
+    try {
+      const token = localStorage.getItem('healthcareToken'); 
+      const staffInfo = localStorage.getItem('staffInfo');   
+      
+      if (!token || !staffInfo) {
+        window.location.replace('/healthcare-login');
+        return;
+      }
+
+      const isValid = await validateHealthcareToken();
+      if (!isValid) {
+        localStorage.clear();
+        window.location.replace('/healthcare-login');
+        return;
+      }
+
+      const parsedStaffInfo = JSON.parse(staffInfo);
+      
+      if (parsedStaffInfo.role !== 'Doctor') {
+        alert('Access denied. This system is for doctors only.');
+        window.location.replace('/healthcare-login');
+        return;
+      }
+      
+      setStaffInfo({
+        staffId: parsedStaffInfo.staff_id,
+        name: parsedStaffInfo.name,
+        role: 'Attending Physician',
+        department: parsedStaffInfo.specialization || 'General Medicine',
+        staffType: 'doctor'
+      });
+
+      // Fetch initial data
+      await fetchPatientQueue();
+      await fetchMyPatients();
+      await fetchOverallPatients();
+      
+      setLoading(false);
 
     } catch (error) {
-      console.error('💥 Temp registration error:', error);
-      res.status(500).json({
-        error: 'Registration failed. Please try again.',
-        details: error.message
-      });
+      console.error('Error initializing dashboard:', error);
+      localStorage.clear();
+      window.location.replace('/healthcare-login');
     }
-  });
+  };
 
-
-  // PUT /api/temp-registration/:id/health-assessment - Update with health assessment data
-  app.put('/api/temp-registration/:id/health-assessment', async (req, res) => {
+  initializeDashboard();
+  
+  // Set up auto-refresh every 60 seconds
+  const interval = setInterval(async () => {
     try {
-      console.log('🩺 Health assessment update for ID:', req.params.id);
-      
-      const { id } = req.params;
-      const {
-        symptoms,
-        duration,
-        severity,
-        previous_treatment,
-        allergies,
-        medications,
-        preferred_date,
-        preferred_time_slot,
-        scheduled_date,
-        status
-      } = req.body;
-
-
-      // Update tempReg with health assessment data
-      const { data: updatedData, error: updateError } = await supabase
-        .from('tempReg')
-        .update({
-          symptoms,
-          duration,
-          severity,
-          previous_treatment,
-          allergies,
-          medications,
-          preferred_date,
-          preferred_time_slot,
-          scheduled_date,
-          status: status || 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('temp_id', id)
-        .select()
-        .single();
-
-
-      if (updateError) {
-        console.error('💥 Health assessment update error:', updateError);
-        return res.status(500).json({
-          error: 'Failed to update health assessment. Please try again.',
-          details: updateError.message
-        });
+      await fetchPatientQueue();
+      if (currentPage === 'patients') {
+        await fetchMyPatients();
       }
-
-
-      if (!updatedData) {
-        return res.status(404).json({
-          error: 'Registration not found'
-        });
-      }
-
-
-      console.log('✅ Health assessment updated for:', updatedData.name);
-
-
-      res.json({
-        success: true,
-        message: 'Health assessment updated successfully',
-        data: updatedData
-      });
-
-
     } catch (error) {
-      console.error('💥 Health assessment update error:', error);
-      res.status(500).json({
-        error: 'Failed to update health assessment. Please try again.',
-        details: error.message
-      });
+      console.error('Auto-refresh error:', error);
     }
-  });
+  }, 60000);
+  
+  return () => clearInterval(interval);
+}, []); // Empty dependency array
 
-
-  // POST /api/generate-qr-email - Generate QR code and send via email
-  app.post('/api/generate-qr-email', async (req, res) => {
-    try {
-      console.log('📧 QR generation request received');
-      
-      const { qrData, patientEmail, patientName } = req.body;
-
-
-      // Validate input
-      if (!qrData || !patientEmail || !patientName) {
-        console.error('Missing required data:', { qrData: !!qrData, patientEmail: !!patientEmail, patientName: !!patientName });
-        return res.status(400).json({
-          error: 'Missing required data for QR generation'
-        });
-      }
-
-
-      // Step 1: Generate QR code
-      console.log('Step 1: Generating QR code...');
-      let qrCodeDataURL;
+useEffect(() => {
+  const fetchLabDataWhenNeeded = async () => {
+    if (currentPage === 'lab-orders') {
       try {
-        const qrString = JSON.stringify(qrData);
-        console.log('QR data string length:', qrString.length);
+        await fetchLabRequests();
+        await fetchLabResults();
         
-        qrCodeDataURL = await QRCode.toDataURL(qrString, {
-          width: 256,
-          margin: 1,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
-        console.log('✅ QR code generated successfully');
-      } catch (qrError) {
-        console.error('❌ QR generation failed:', qrError.message);
-        return res.status(500).json({
-          error: 'QR code generation failed',
-          details: qrError.message
-        });
+        // Combine data after both requests complete
+        const combinedData = labRequests.map(request => ({
+          ...request,
+          hasResult: request.labResult !== null,
+          resultData: request.labResult || null
+        }));
+        
+        setAllLabData(combinedData);
+      } catch (error) {
+        console.error('Error fetching lab data:', error);
       }
+    }
+  };
 
+  fetchLabDataWhenNeeded();
+}, [currentPage]); // Remove labRequests and labResults from dependency array
 
-      // Step 2: Convert to buffer
-      console.log('Step 2: Converting to buffer...');
-      let qrCodeBuffer;
-      try {
-        const base64Data = qrCodeDataURL.replace(/^data:image\/png;base64,/, '');
-        qrCodeBuffer = Buffer.from(base64Data, 'base64');
-        console.log('✅ Buffer created, size:', qrCodeBuffer.length, 'bytes');
-      } catch (bufferError) {
-        console.error('❌ Buffer conversion failed:', bufferError.message);
-        return res.status(500).json({
-          error: 'Image processing failed',
-          details: bufferError.message
-        });
+  useEffect(() => {
+    if (currentPage === 'patients' && selectedPatient) {
+      const interval = setInterval(() => {
+        fetchPatientHistory(selectedPatient.patient_id, historyPagination.currentPage);
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentPage, selectedPatient, historyPagination.currentPage]);
+
+  const fetchLabRequests = async () => {
+    try {
+      const token = localStorage.getItem('healthcareToken');
+      
+      const response = await fetch('http://localhost:5000/api/healthcare/lab-requests', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLabRequests(data.labRequests || []);
       }
+    } catch (error) {
+      console.error('Failed to fetch lab requests:', error);
+    }
+  };
 
+  const fetchLabResults = async () => {
+    try {
+      const token = localStorage.getItem('healthcareToken');
+      
+      const response = await fetch('http://localhost:5000/api/healthcare/lab-results', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
 
-      // Step 3: Prepare email
-      console.log('Step 3: Preparing email...');
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f5f5f5; padding: 20px;">
-          <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%); color: white; padding: 30px; text-align: center;">
-              <h1 style="margin: 0; font-size: 28px;">🏥 CliCare Hospital</h1>
-              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Registration Confirmation</p>
-            </div>
+      if (response.ok) {
+        const data = await response.json();
+        setLabResults(data.labResults || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch lab results:', error);
+    }
+  };
+
+  // Fix the createLabRequest function (around line 180)
+const createLabRequest = async () => {
+  try {
+    // Validate required fields
+    if (!selectedPatientForLab) {
+      alert('Please select a patient');
+      return;
+    }
+    
+    if (!labRequestForm.test_name.trim()) {
+      alert('Please enter test name');
+      return;
+    }
+    
+    if (!labRequestForm.test_type) {
+      alert('Please select test type');
+      return;
+    }
+    
+    if (!labRequestForm.due_date) {
+      alert('Please select due date');
+      return;
+    }
+
+    const token = localStorage.getItem('healthcareToken');
+    
+    const requestData = {
+      patient_id: selectedPatientForLab.patient_id,
+      test_name: labRequestForm.test_name.trim(),
+      test_type: labRequestForm.test_type,
+      priority: labRequestForm.priority || 'normal',
+      instructions: labRequestForm.instructions.trim(),
+      due_date: labRequestForm.due_date
+    };
+
+    console.log('Creating lab request:', requestData);
+
+    const response = await fetch('http://localhost:5000/api/healthcare/lab-requests', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData)
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert('Lab request created successfully!');
+      
+      // Reset form and close modal
+      setShowLabRequestModal(false);
+      setSelectedPatientForLab(null);
+      setLabRequestForm({
+        test_name: '',
+        test_type: '',
+        priority: 'normal',
+        instructions: '',
+        due_date: ''
+      });
+      
+      // Refresh data properly
+      await fetchLabRequests();
+      await fetchLabResults();
+      
+      // Update combined data
+      const combinedData = labRequests.map(request => ({
+        ...request,
+        hasResult: request.labResult !== null,
+        resultData: request.labResult || null
+      }));
+      
+      setAllLabData(combinedData);
+      
+    } else {
+      throw new Error(result.error || 'Failed to create lab request');
+    }
+
+  } catch (error) {
+    console.error('Failed to create lab request:', error);
+    alert('Failed to create lab request: ' + error.message);
+  }
+};
+
+  const fetchPatientModal = async (patientId) => {
+    try {
+      setModalLoading(true);
+      const token = localStorage.getItem('healthcareToken');
+      
+      const response = await fetch(`http://localhost:5000/api/healthcare/patient-details/${patientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedPatientModal(data.patient);
+      }
+    } catch (error) {
+      console.error('Failed to fetch patient details:', error);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const fetchMyPatients = async () => {
+    try {
+      const token = localStorage.getItem('healthcareToken');
+      const today = new Date().toISOString().split('T')[0];
+      
+      const response = await fetch(`http://localhost:5000/api/healthcare/my-patients-queue?date=${today}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMyPatients(data.patients || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch my patients:', error);
+    }
+  };
+
+  const fetchPatientHistory = async (patientId, page = 1) => {
+    try {
+      setHistoryLoading(true);
+      const token = localStorage.getItem('healthcareToken');
+      
+      const response = await fetch(`http://localhost:5000/api/healthcare/patient-history/${patientId}?page=${page}&limit=10`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedPatient(data.patient);
+        setPatientHistory(data.visitHistory || []);
+        setHistoryPagination(data.pagination);
+      } else {
+        setPatientHistory([]);
+        setSelectedPatient(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch patient history:', error);
+      setPatientHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const fetchPatientQueue = async () => {
+    try {
+      setQueueLoading(true);
+      const token = localStorage.getItem('healthcareToken');
+      
+      const response = await fetch('http://localhost:5000/api/healthcare/patient-queue', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPatientQueue(data.queue || []);
+        
+        // Update dashboard stats
+        setDashboardData(prev => ({
+          ...prev,
+          todayStats: data.todayStats
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch patient queue:', error);
+    } finally {
+      setQueueLoading(false);
+    }
+  };
+
+  const updateQueueStatus = async (queueId, newStatus) => {
+    try {
+      const token = localStorage.getItem('healthcareToken');
+      
+      const response = await fetch(`http://localhost:5000/api/healthcare/queue/${queueId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        // Refresh the queue
+        fetchPatientQueue();
+      }
+    } catch (error) {
+      console.error('Failed to update queue status:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      localStorage.clear();
+      window.location.replace('/healthcare-login');
+    }
+  };
+
+  const getMenuItems = () => {
+    return [
+      { id: 'overview', icon: '📊', label: 'Dashboard Overview', description: 'Daily statistics and activities' },
+      { id: 'patients', icon: '👥', label: 'My Patients', description: 'Today\'s consultations only' },
+      { id: 'overall-patients', icon: '👤', label: 'Overall Patient', description: 'All registered patients' },
+      { id: 'lab-orders', icon: '🧪', label: 'Lab Orders', description: 'Laboratory test requests' }
+    ];
+  };
+
+  const renderLabOrdersPage = () => (
+    <div className="healthcare-page-content">
+      <div className="healthcare-page-header">
+        <h2>Laboratory Management</h2>
+        <p>Manage laboratory test requests and review submitted results</p>
+      </div>
+
+      <div className="healthcare-lab-tabs">
+        <div className="healthcare-tab-buttons">
+          <button 
+            className={`healthcare-tab-btn ${activeLabTab === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveLabTab('all')}
+          >
+            All Lab Orders ({allLabData.length})
+          </button>
+          <button 
+            className={`healthcare-tab-btn ${activeLabTab === 'pending' ? 'active' : ''}`}
+            onClick={() => setActiveLabTab('pending')}
+          >
+            Pending Upload ({allLabData.filter(item => item.status === 'pending').length})
+          </button>
+          <button 
+            className={`healthcare-tab-btn ${activeLabTab === 'completed' ? 'active' : ''}`}
+            onClick={() => setActiveLabTab('completed')}
+          >
+            Completed ({allLabData.filter(item => item.status === 'completed' && item.hasResult).length})
+          </button>
+        </div>
+
+      <div className="healthcare-lab-actions">
+        <button 
+  onClick={async () => {
+    try {
+      setLabDataLoading(true);
+      await fetchLabRequests();
+      await fetchLabResults();
+      
+      // Update combined data after refresh
+      const combinedData = labRequests.map(request => ({
+        ...request,
+        hasResult: request.labResult !== null,
+        resultData: request.labResult || null
+      }));
+      
+      setAllLabData(combinedData);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setLabDataLoading(false);
+    }
+  }}
+  className="healthcare-action-btn"
+  disabled={labDataLoading}
+>
+  {labDataLoading ? '🔄 Loading...' : '🔄 Refresh'}
+</button>
+        <button 
+          onClick={() => {
+            // Check if we have any patients available from overall patients or queue
+            const availablePatients = [...(myPatients || []), ...(overallPatients || [])];
             
-            <div style="padding: 30px;">
-              <h2 style="color: #333; margin-top: 0;">Hello ${patientName},</h2>
-              <p style="color: #666; line-height: 1.6; font-size: 16px;">Your registration has been completed successfully! Please present the QR code below when you arrive at the hospital.</p>
-              
-              <div style="background: #f8f9fa; padding: 30px; border-radius: 8px; text-align: center; margin: 25px 0; border: 2px dashed #dee2e6;">
-                <img src="cid:qrcode" alt="Registration QR Code" style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;">
-                <p style="color: #666; font-size: 14px; margin: 15px 0 0 0; font-weight: 500;">Present this QR code at registration</p>
+            if (availablePatients.length === 0) {
+              alert('No patients available. Please ensure there are patients in the system or refresh the page.');
+              return;
+            }
+            
+            // Set the first available patient as default
+            setSelectedPatientForLab(availablePatients[0]);
+            setShowLabRequestModal(true);
+          }}
+          className="healthcare-action-btn primary"
+        >
+          + New Lab Request
+        </button>
+      </div>
+      </div>
+
+      {labDataLoading ? (
+        <div className="healthcare-loading-container">
+          <div className="healthcare-loading-spinner"></div>
+          <p>Loading laboratory data...</p>
+        </div>
+      ) : (
+        <div className="healthcare-lab-results-section">
+          {getFilteredLabData().length === 0 ? (
+            <div className="healthcare-no-data">
+              <div className="healthcare-no-data-icon">🧪</div>
+              <p>No {activeLabTab === 'all' ? 'lab orders' : activeLabTab === 'pending' ? 'pending requests' : 'completed results'} found</p>
+              {activeLabTab === 'all' && (
+                <button 
+                  onClick={() => setShowLabRequestModal(true)}
+                  className="healthcare-action-btn"
+                >
+                  Create First Lab Request
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="healthcare-lab-results-grid">
+              {getFilteredLabData().map((item) => (
+                <div key={item.request_id} className={`healthcare-lab-result-card ${item.status}`}>
+                  <div className="healthcare-lab-result-header">
+                    <div className="healthcare-lab-info">
+                      <h4>{item.test_name}</h4>
+                      <div className="healthcare-lab-meta">
+                        <span className="healthcare-request-id">#{item.request_id}</span>
+                        <span className={`healthcare-lab-status ${item.status}`}>
+                          {item.status === 'pending' ? 'Awaiting Upload' : 
+                           item.status === 'completed' ? 'Result Available' : 
+                           item.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="healthcare-lab-actions">
+                      {item.hasResult && item.resultData && (
+                        <button 
+                          onClick={() => handleViewFile(item.resultData.file_url, item.resultData.file_name)}
+                          className="healthcare-view-result-btn"
+                          title="View uploaded result"
+                        >
+                          View File
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="healthcare-lab-result-content">
+                    <div className="healthcare-patient-info">
+                      <div className="healthcare-patient-details">
+                        <strong>{item.patient?.name}</strong>
+                        <span>ID: {item.patient?.patient_id}</span>
+                        <span>{item.patient?.age}y, {item.patient?.sex}</span>
+                      </div>
+                      <div className="healthcare-contact-info">
+                        <span>{item.patient?.contact_no}</span>
+                      </div>
+                    </div>
+
+                    <div className="healthcare-lab-details">
+                      <div className="healthcare-lab-detail-row">
+                        <span>Test Type:</span>
+                        <span>{item.test_type}</span>
+                      </div>
+                      <div className="healthcare-lab-detail-row">
+                        <span>Priority:</span>
+                        <span className={`priority ${item.priority}`}>{item.priority}</span>
+                      </div>
+                      <div className="healthcare-lab-detail-row">
+                        <span>Requested:</span>
+                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="healthcare-lab-detail-row">
+                        <span>Due Date:</span>
+                        <span>{new Date(item.due_date).toLocaleDateString()}</span>
+                      </div>
+                      {item.instructions && (
+                        <div className="healthcare-lab-instructions">
+                          <strong>Instructions:</strong> {item.instructions}
+                        </div>
+                      )}
+                    </div>
+
+                    {item.hasResult && item.resultData && (
+                      <div className="healthcare-result-info">
+                        <div className="healthcare-result-header">
+                          <strong>Result Submitted</strong>
+                          <span className="healthcare-upload-date">
+                            {new Date(item.resultData.upload_date).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="healthcare-result-file">
+                          <span className="healthcare-file-icon">📄</span>
+                          <span className="healthcare-file-name">{item.resultData.file_name}</span>
+                          <button 
+                            onClick={() => handleViewFile(item.resultData.file_url, item.resultData.file_name)}
+                            className="healthcare-file-view-btn"
+                          >
+                            Open
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {item.status === 'pending' && (
+                      <div className="healthcare-pending-notice">
+                        <div className="healthcare-pending-icon">⏳</div>
+                        <div className="healthcare-pending-text">
+                          <strong>Waiting for patient to upload result</strong>
+                          <small>Patient will receive notification to upload their lab result</small>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Lab Request Modal */}
+      {/* Lab Request Modal - FIXED VERSION */}
+{showLabRequestModal && (
+  <div className="healthcare-modal-overlay">
+    <div className="healthcare-modal">
+      <div className="healthcare-modal-header">
+        <h3>Create Lab Request</h3>
+        <button 
+          onClick={() => {
+            setShowLabRequestModal(false);
+            setSelectedPatientForLab(null);
+            setLabRequestForm({
+              test_name: '',
+              test_type: '',
+              priority: 'normal',
+              instructions: '',
+              due_date: ''
+            });
+          }}
+          className="healthcare-modal-close"
+        >
+          ✕
+        </button>
+      </div>
+      
+      <div className="healthcare-modal-content">
+        <div className="healthcare-form-group">
+          <label>Select Patient: *</label>
+          <select 
+            value={selectedPatientForLab?.patient_id || ''}
+            onChange={(e) => {
+              const allAvailablePatients = [...(myPatients || []), ...(overallPatients || [])];
+              const patient = allAvailablePatients.find(p => p.patient_id === e.target.value);
+              setSelectedPatientForLab(patient);
+            }}
+            className="healthcare-form-select"
+            required
+          >
+            <option value="">Choose a patient</option>
+            {/* My Patients Group */}
+            {myPatients && myPatients.length > 0 && (
+              <optgroup label="My Patients (Today)">
+                {myPatients.map(patient => (
+                  <option key={`my-${patient.patient_id}`} value={patient.patient_id}>
+                    {patient.name} ({patient.patient_id}) - {patient.age}y, {patient.sex}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            
+            {/* All Patients Group */}
+            {overallPatients && overallPatients.length > 0 && (
+              <optgroup label="All Patients">
+                {overallPatients
+                  .filter(patient => !myPatients?.find(mp => mp.patient_id === patient.patient_id)) // Avoid duplicates
+                  .map(patient => (
+                    <option key={`all-${patient.patient_id}`} value={patient.patient_id}>
+                      {patient.name} ({patient.patient_id}) - {patient.age}y, {patient.sex}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </select>
+          {selectedPatientForLab && (
+            <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
+              Selected: {selectedPatientForLab.name} | Contact: {selectedPatientForLab.contact_no}
+            </small>
+          )}
+        </div>
+
+        <div className="healthcare-form-group">
+          <label>Test Name: *</label>
+          <input 
+            type="text"
+            value={labRequestForm.test_name}
+            onChange={(e) => setLabRequestForm(prev => ({
+              ...prev, 
+              test_name: e.target.value
+            }))}
+            placeholder="e.g., Complete Blood Count, Chest X-Ray"
+            className="healthcare-form-input"
+            required
+          />
+        </div>
+
+        <div className="healthcare-form-group">
+          <label>Test Type: *</label>
+          <select 
+            value={labRequestForm.test_type}
+            onChange={(e) => setLabRequestForm(prev => ({
+              ...prev, 
+              test_type: e.target.value
+            }))}
+            className="healthcare-form-select"
+            required
+          >
+            <option value="">Select test type</option>
+            <option value="Blood Test">Blood Test</option>
+            <option value="Urine Test">Urine Test</option>
+            <option value="Stool Test">Stool Test</option>
+            <option value="X-Ray">X-Ray</option>
+            <option value="CT Scan">CT Scan</option>
+            <option value="MRI">MRI</option>
+            <option value="Ultrasound">Ultrasound</option>
+            <option value="ECG">ECG/EKG</option>
+            <option value="Echo">Echocardiogram</option>
+            <option value="Biopsy">Biopsy</option>
+            <option value="Culture">Culture Test</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div className="healthcare-form-group">
+          <label>Priority:</label>
+          <select 
+            value={labRequestForm.priority}
+            onChange={(e) => setLabRequestForm(prev => ({
+              ...prev, 
+              priority: e.target.value
+            }))}
+            className="healthcare-form-select"
+          >
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="stat">STAT (Immediate)</option>
+          </select>
+        </div>
+
+        <div className="healthcare-form-group">
+          <label>Due Date: *</label>
+          <input 
+            type="date"
+            value={labRequestForm.due_date}
+            onChange={(e) => setLabRequestForm(prev => ({
+              ...prev, 
+              due_date: e.target.value
+            }))}
+            min={new Date().toISOString().split('T')[0]}
+            className="healthcare-form-input"
+            required
+          />
+        </div>
+
+        <div className="healthcare-form-group">
+          <label>Special Instructions:</label>
+          <textarea 
+            value={labRequestForm.instructions}
+            onChange={(e) => setLabRequestForm(prev => ({
+              ...prev, 
+              instructions: e.target.value
+            }))}
+            placeholder="Any special instructions for the patient or lab..."
+            className="healthcare-form-textarea"
+            rows="3"
+          />
+        </div>
+      </div>
+
+      <div className="healthcare-modal-actions">
+        <button 
+          onClick={() => {
+            setShowLabRequestModal(false);
+            setSelectedPatientForLab(null);
+            setLabRequestForm({
+              test_name: '',
+              test_type: '',
+              priority: 'normal',
+              instructions: '',
+              due_date: ''
+            });
+          }}
+          className="healthcare-modal-btn secondary"
+        >
+          Cancel
+        </button>
+        <button 
+          onClick={createLabRequest}
+          disabled={!selectedPatientForLab || !labRequestForm.test_name.trim() || !labRequestForm.test_type || !labRequestForm.due_date}
+          className="healthcare-modal-btn primary"
+        >
+          Create Request
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+    </div>
+  );
+
+  const renderOverview = () => (
+    <div className="healthcare-page-content">
+      <div className="healthcare-page-header">
+        <h2>Dashboard Overview</h2>
+        <p>Welcome back, {staffInfo.name}</p>
+      </div>
+
+      {loading ? (
+        <div className="healthcare-loading-container">
+          <div className="healthcare-loading-spinner"></div>
+          <p>Loading dashboard data...</p>
+        </div>
+      ) : (
+        <>
+          <div className="healthcare-stats-grid">
+            <div className="healthcare-stat-card">
+              <div className="healthcare-stat-icon">👥</div>
+              <div className="healthcare-stat-content">
+                <h3>My Patients</h3>
+                <div className="healthcare-stat-number">{dashboardData.todayStats.myPatients}</div>
+                <small>Today's consultations</small>
               </div>
-              
-              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0;">
-                <h3 style="color: #1a73e8; margin-top: 0; font-size: 18px;">📋 Appointment Details</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                  <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px 0; color: #666; font-weight: 600;">Department:</td>
-                    <td style="padding: 10px 0; color: #333;">${qrData.department || 'General Practice'}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px 0; color: #666; font-weight: 600;">Date:</td>
-                    <td style="padding: 10px 0; color: #333;">${qrData.scheduledDate || 'To be confirmed'}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px 0; color: #666; font-weight: 600;">Time:</td>
-                    <td style="padding: 10px 0; color: #333;">${qrData.preferredTime || 'To be confirmed'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0; color: #666; font-weight: 600;">Temp ID:</td>
-                    <td style="padding: 10px 0; color: #333; font-family: monospace;">${qrData.tempPatientId || 'N/A'}</td>
-                  </tr>
-                </table>
+            </div>
+
+            <div className="healthcare-stat-card">
+              <div className="healthcare-stat-icon">👤</div>
+              <div className="healthcare-stat-content">
+                <h3>Overall Patient</h3>
+                <div className="healthcare-stat-number">{totalPatients}</div>
+                <small>Total registered</small>
               </div>
-              
-              <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; border-left: 4px solid #2196f3;">
-                <h4 style="margin-top: 0; color: #1565c0; font-size: 16px;">📝 What to do next:</h4>
-                <ol style="color: #666; margin: 10px 0 0 0; padding-left: 20px; line-height: 1.6;">
-                  <li>Arrive 15 minutes before your scheduled time</li>
-                  <li>Go directly to the registration desk</li>
-                  <li>Show this QR code to the staff</li>
-                  <li>Wait for your queue number to be called</li>
-                </ol>
-              </div>
-              
-              <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-                <p style="color: #999; font-size: 12px; margin: 0;">
-                  This is an automated message from CliCare Hospital<br>
-                  Please do not reply to this email
-                </p>
+            </div>
+
+            <div className="healthcare-stat-card">
+              <div className="healthcare-stat-icon">🧪</div>
+              <div className="healthcare-stat-content">
+                <h3>Lab Results</h3>
+                <div className="healthcare-stat-number">{dashboardData.todayStats.labResults}</div>
+                <small>Available to review</small>
               </div>
             </div>
           </div>
+
+          <div className="healthcare-content-grid">
+            <div className="healthcare-queue-section">
+              <h3>Patient Queue ({patientQueue.length})</h3>
+              {queueLoading ? (
+                <div className="healthcare-loading-spinner"></div>
+              ) : (
+                <div className="healthcare-queue-list">
+                  {patientQueue.length === 0 ? (
+                    <div className="healthcare-queue-empty">
+                      <p>No patients in queue</p>
+                    </div>
+                  ) : (
+                    patientQueue.map((item) => (
+                      <div key={item.queue_id} className="healthcare-queue-item">
+                        <div className="healthcare-queue-number">#{item.queue_no}</div>
+                        <div className="healthcare-queue-content">
+                          <div className="healthcare-queue-patient">
+                            {item.visit.outPatient.name}
+                          </div>
+                          <div className="healthcare-queue-id">
+                            {item.visit.outPatient.patient_id}
+                          </div>
+                          <div className="healthcare-queue-symptoms">
+                            {item.visit.symptoms}
+                          </div>
+                          <div className="healthcare-queue-time">
+                            {new Date(item.visit.visit_time).toLocaleTimeString()}
+                          </div>
+                        </div>
+                        <div className="healthcare-queue-actions">
+                          {item.status === 'waiting' && (
+                            <button 
+                              onClick={() => updateQueueStatus(item.queue_id, 'in_progress')}
+                              className="healthcare-action-btn start"
+                            >
+                              Start Consultation
+                            </button>
+                          )}
+                          {item.status === 'in_progress' && (
+                            <button 
+                              onClick={() => updateQueueStatus(item.queue_id, 'completed')}
+                              className="healthcare-action-btn complete"
+                            >
+                              Mark Complete
+                            </button>
+                          )}
+                          <div className={`healthcare-queue-status ${item.status}`}>
+                            {item.status === 'waiting' ? '⏳ Waiting' : 
+                             item.status === 'in_progress' ? '🔄 In Progress' : '✅ Complete'}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="healthcare-activity-section">
+              <h3>Quick Actions</h3>
+              <div className="healthcare-quick-actions">
+                <button 
+                  onClick={fetchPatientQueue} 
+                  className="healthcare-action-btn"
+                  disabled={queueLoading}
+                >
+                  🔄 Refresh Queue
+                </button>
+                <button 
+                  onClick={() => setCurrentPage('overall-patients')}
+                  className="healthcare-action-btn"
+                >
+                  👥 View All Patients
+                </button>
+                <button className="healthcare-action-btn">💊 New Prescription</button>
+                <button 
+                  onClick={() => setCurrentPage('lab-orders')}
+                  className="healthcare-action-btn"
+                >
+                  🧪 Order Lab Test
+                </button>
+                <button 
+                  onClick={() => setCurrentPage('patients')}
+                  className="healthcare-action-btn"
+                >
+                  📋 Patient History
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const renderPlaceholderPage = (title, description) => (
+    <div className="healthcare-page-content">
+      <div className="healthcare-page-header">
+        <h2>{title}</h2>
+        <p>{description}</p>
+      </div>
+      <div className="healthcare-placeholder">
+        <div className="healthcare-placeholder-icon">🚧</div>
+        <h3>Coming Soon</h3>
+        <p>This feature is currently under development and will be available in the next release.</p>
+        <button 
+          onClick={() => setCurrentPage('overview')}
+          className="healthcare-back-btn"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderMyPatientsPage = () => (
+    <div className="healthcare-page-content">
+      <div className="healthcare-page-header">
+        <h2>My Patients</h2>
+        <p>Today's consultations and queue for {staffInfo.department}</p>
+      </div>
+
+      <div className="healthcare-patients-layout">
+        {/* Patient List */}
+        <div className="healthcare-patients-list">
+          <div className="healthcare-patients-header">
+            <h3>Today's Patients ({myPatients.length})</h3>
+            <button 
+              onClick={fetchMyPatients}
+              className="healthcare-refresh-btn"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+          
+          {myPatients.length === 0 ? (
+            <div className="healthcare-no-patients">
+              <div className="healthcare-no-data-icon">👥</div>
+              <h4>No patients found</h4>
+              <p>No patients in queue or completed consultations for today.</p>
+            </div>
+          ) : (
+            <div className="healthcare-patient-cards">
+              {/* Queue Patients First */}
+              {myPatients.filter(patient => patient.isInQueue).map((patient) => (
+                <div 
+                  key={`queue-${patient.patient_id}`}
+                  className={`healthcare-patient-card queue-patient ${selectedPatient?.patient_id === patient.patient_id ? 'active' : ''}`}
+                  onClick={() => fetchPatientHistory(patient.patient_id)}
+                >
+                  <div className="healthcare-patient-info">
+                    <div className="healthcare-patient-name">
+                      {patient.name} 
+                      <span className="queue-indicator">#{patient.queueNumber}</span>
+                    </div>
+                    <div className="healthcare-patient-id">{patient.patient_id}</div>
+                    <div className="healthcare-patient-details">
+                      {patient.age} years old, {patient.sex}
+                    </div>
+                    <div className="healthcare-patient-contact">{patient.contact_no}</div>
+                    <div className="patient-symptoms">
+                      <strong>Symptoms:</strong> {patient.lastSymptoms}
+                    </div>
+                  </div>
+                  <div className="healthcare-patient-status">
+                    <div className="healthcare-visit-time">
+                      Visit: {new Date(`1970-01-01T${patient.visitTime}`).toLocaleTimeString()}
+                    </div>
+                    <div className={`healthcare-queue-status ${patient.queueStatus}`}>
+                      {patient.queueStatus === 'waiting' ? '⏳ Waiting' : 
+                       patient.queueStatus === 'in_progress' ? '🔄 In Progress' : patient.queueStatus}
+                    </div>
+                  </div>
+                  {patient.queueStatus === 'in_progress' && (
+                    <div className="current-consultation">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPatientForLab(patient);
+                          setShowLabRequestModal(true);
+                        }}
+                        className="healthcare-action-btn lab-request"
+                      >
+                        🧪 Request Lab
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {/* Separator */}
+              {myPatients.filter(patient => patient.isInQueue).length > 0 && 
+               myPatients.filter(patient => !patient.isInQueue).length > 0 && (
+                <div className="patients-separator">
+                  <h4>Completed Today</h4>
+                </div>
+              )}
+              
+              {/* Completed Patients */}
+              {myPatients.filter(patient => !patient.isInQueue).map((patient) => (
+                <div 
+                  key={`completed-${patient.patient_id}`}
+                  className={`healthcare-patient-card completed-patient ${selectedPatient?.patient_id === patient.patient_id ? 'active' : ''}`}
+                  onClick={() => fetchPatientHistory(patient.patient_id)}
+                >
+                  <div className="healthcare-patient-info">
+                    <div className="healthcare-patient-name">{patient.name}</div>
+                    <div className="healthcare-patient-id">{patient.patient_id}</div>
+                    <div className="healthcare-patient-details">
+                      {patient.age} years old, {patient.sex}
+                    </div>
+                    <div className="healthcare-patient-contact">{patient.contact_no}</div>
+                  </div>
+                  <div className="healthcare-patient-status">
+                    <div className="healthcare-last-visit">
+                      Completed: {new Date(`1970-01-01T${patient.visitTime}`).toLocaleTimeString()}
+                    </div>
+                    <div className={`healthcare-queue-status ${patient.queueStatus}`}>
+                      ✅ Completed
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      `;
 
+        {/* Patient History */}
+        <div className="healthcare-patient-history">
+          {selectedPatient ? (
+            <>
+              <div className="healthcare-history-header">
+                <div className="healthcare-selected-patient">
+                  <h3>{selectedPatient.name}</h3>
+                  <div className="healthcare-patient-summary">
+                    <span>ID: {selectedPatient.patient_id}</span>
+                    <span>{selectedPatient.age} years old, {selectedPatient.sex}</span>
+                    <span>📞 {selectedPatient.contact_no}</span>
+                    <span>📧 {selectedPatient.email}</span>
+                  </div>
+                  {selectedPatient.emergencyContact && selectedPatient.emergencyContact.length > 0 && (
+                    <div className="healthcare-emergency-contact">
+                      <strong>Emergency Contact:</strong> {selectedPatient.emergencyContact[0].name} 
+                      ({selectedPatient.emergencyContact[0].relationship}) - {selectedPatient.emergencyContact[0].contact_number}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-      // Step 4: Send email
-      console.log('Step 4: Sending email to:', patientEmail);
-      try {
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASSWORD
-          }
-        });
-        
-        // Verify connection
-        await transporter.verify();
-        console.log('✅ Email transport verified');
-        
-        const mailOptions = {
-          from: `"CliCare Hospital" <${process.env.EMAIL_USER}>`,
-          to: patientEmail,
-          subject: `Your CliCare Registration QR Code - ${patientName}`,
-          html: emailHtml,
-          attachments: [
-            {
-              filename: 'qr-code.png',
-              content: qrCodeBuffer,
-              cid: 'qrcode'
-            }
-          ]
-        };
+              {historyLoading ? (
+                <div className="healthcare-loading-container">
+                  <div className="healthcare-loading-spinner"></div>
+                  <p>Loading medical history...</p>
+                </div>
+              ) : (
+                <div className="healthcare-history-content">
+                  {patientHistory.length === 0 ? (
+                    <div className="healthcare-no-history">
+                      <div className="healthcare-no-data-icon">📋</div>
+                      <h4>No medical history available</h4>
+                      <p>This patient has no recorded visits or medical records.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="healthcare-history-stats">
+                        <div className="healthcare-stat-item">
+                          <span className="stat-number">{historyPagination.totalVisits}</span>
+                          <span className="stat-label">Total Visits</span>
+                        </div>
+                        <div className="healthcare-stat-item">
+                          <span className="stat-number">
+                            {new Date(selectedPatient.registration_date).toLocaleDateString()}
+                          </span>
+                          <span className="stat-label">Registered</span>
+                        </div>
+                      </div>
 
+                      <div className="healthcare-history-timeline">
+                        {patientHistory.map((visit) => (
+                          <div key={visit.visit_id} className="healthcare-timeline-item">
+                            <div className="healthcare-timeline-date">
+                              <div className="date-day">
+                                {new Date(visit.visit_date).getDate()}
+                              </div>
+                              <div className="date-month">
+                                {new Date(visit.visit_date).toLocaleDateString('en-US', { month: 'short' })}
+                              </div>
+                              <div className="date-year">
+                                {new Date(visit.visit_date).getFullYear()}
+                              </div>
+                            </div>
+                            
+                            <div className="healthcare-timeline-content">
+                              <div className="healthcare-visit-header">
+                                <h4>{visit.appointment_type}</h4>
+                                <span className="visit-time">
+                                  {new Date(`1970-01-01T${visit.visit_time}`).toLocaleTimeString('en-US', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </span>
+                              </div>
 
-        const result = await transporter.sendMail(mailOptions);
-        console.log('✅ Email sent successfully. Message ID:', result.messageId);
+                              <div className="healthcare-visit-details">
+                                <div className="healthcare-symptoms">
+                                  <strong>Chief Complaint:</strong> {visit.symptoms}
+                                </div>
 
+                                {visit.diagnosis && visit.diagnosis.length > 0 && (
+                                  <div className="healthcare-diagnoses">
+                                    <strong>Diagnoses:</strong>
+                                    {visit.diagnosis.map((diag) => (
+                                      <div key={diag.diagnosis_id} className="healthcare-diagnosis-item">
+                                        <div className="diagnosis-header">
+                                          <span className={`diagnosis-type ${diag.diagnosis_type}`}>
+                                            {diag.diagnosis_type}
+                                          </span>
+                                          <span className={`diagnosis-severity ${diag.severity}`}>
+                                            {diag.severity}
+                                          </span>
+                                        </div>
+                                        <div className="diagnosis-desc">{diag.diagnosis_description}</div>
+                                        {diag.notes && (
+                                          <div className="diagnosis-notes">
+                                            <strong>Notes:</strong> {diag.notes}
+                                          </div>
+                                        )}
+                                        {diag.healthStaff && (
+                                          <div className="diagnosis-doctor">
+                                            <strong>Diagnosed by:</strong> Dr. {diag.healthStaff.name} ({diag.healthStaff.specialization})
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
 
-      } catch (emailError) {
-        console.error('❌ Email sending failed:', emailError.message);
-        return res.status(500).json({
-          error: 'Failed to send email',
-          details: emailError.message
-        });
-      }
+                                {visit.queue && visit.queue.length > 0 && (
+                                  <div className="healthcare-visit-queue-info">
+                                    <div className="queue-department">
+                                      <strong>Department:</strong> {visit.queue[0].department.name}
+                                    </div>
+                                    <div className="queue-number">
+                                      <strong>Queue Number:</strong> #{visit.queue[0].queue_no}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
 
+                      {/* Pagination */}
+                      {historyPagination.totalPages > 1 && (
+                        <div className="healthcare-pagination">
+                          <button
+                            onClick={() => fetchPatientHistory(selectedPatient.patient_id, historyPagination.currentPage - 1)}
+                            disabled={historyPagination.currentPage === 1}
+                            className="healthcare-page-btn"
+                          >
+                            Previous
+                          </button>
+                          
+                          <span className="healthcare-page-info">
+                            Page {historyPagination.currentPage} of {historyPagination.totalPages}
+                          </span>
+                          
+                          <button
+                            onClick={() => fetchPatientHistory(selectedPatient.patient_id, historyPagination.currentPage + 1)}
+                            disabled={!historyPagination.hasNextPage}
+                            className="healthcare-page-btn"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="healthcare-select-patient">
+              <div className="healthcare-no-data-icon">👈</div>
+              <h4>Select a patient</h4>
+              <p>Choose a patient from the list to view their medical history</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
-      // Step 5: Update database (optional)
-      try {
-        await supabase
-          .from('tempReg')
-          .update({ 
-            qr_code: JSON.stringify(qrData),
-            updated_at: new Date().toISOString()
-          })
-          .eq('temp_patient_id', qrData.tempPatientId);
-        console.log('✅ Database updated');
-      } catch (dbError) {
-        console.warn('⚠️ Database update failed (non-critical):', dbError.message);
-      }
+  const renderOverallPatientsPage = () => (
+    <div className="healthcare-page-content">
+      <div className="healthcare-page-header">
+        <h2>Overall Patient</h2>
+        <p>All registered patients in the system ({totalPatients} total)</p>
+      </div>
 
+      {overallLoading ? (
+        <div className="healthcare-loading-container">
+          <div className="healthcare-loading-spinner"></div>
+          <p>Loading all patients...</p>
+        </div>
+      ) : (
+        <div className="healthcare-overall-patients">
+          <div className="healthcare-patients-table-container">
+            <table className="healthcare-patients-table">
+              <thead>
+                <tr>
+                  <th>Patient ID</th>
+                  <th>Name</th>
+                  <th>Age</th>
+                  <th>Sex</th>
+                  <th>Contact</th>
+                  <th>Registration Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overallPatients.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="healthcare-no-data">
+                      <div className="healthcare-no-data-icon">👥</div>
+                      <p>No patients found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  overallPatients.map((patient) => (
+                    <tr 
+                      key={patient.patient_id}
+                      className="healthcare-table-row"
+                      onClick={() => fetchPatientModal(patient.patient_id)}
+                    >
+                      <td>{patient.patient_id}</td>
+                      <td className="healthcare-patient-name-cell">{patient.name}</td>
+                      <td>{patient.age}</td>
+                      <td>{patient.sex}</td>
+                      <td>{patient.contact_no}</td>
+                      <td>{new Date(patient.registration_date).toLocaleDateString()}</td>
+                      <td>
+                        <button 
+                          className="healthcare-view-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fetchPatientModal(patient.patient_id);
+                          }}
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      console.log('🎉 QR generation and email process completed successfully');
+      {/* Patient Details Modal */}
+      {selectedPatientModal && (
+        <div className="healthcare-modal-overlay" onClick={() => setSelectedPatientModal(null)}>
+          <div className="healthcare-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="healthcare-modal-header">
+              <h3>Patient Information</h3>
+              <button 
+                className="healthcare-modal-close"
+                onClick={() => setSelectedPatientModal(null)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {modalLoading ? (
+              <div className="healthcare-modal-loading">
+                <div className="healthcare-loading-spinner"></div>
+                <p>Loading patient details...</p>
+              </div>
+            ) : (
+              <div className="healthcare-modal-content">
+                <div className="healthcare-modal-section">
+                  <h4>Personal Information</h4>
+                  <div className="healthcare-modal-grid">
+                    <div><strong>Patient ID:</strong> {selectedPatientModal.patient_id}</div>
+                    <div><strong>Name:</strong> {selectedPatientModal.name}</div>
+                    <div><strong>Age:</strong> {selectedPatientModal.age} years</div>
+                    <div><strong>Sex:</strong> {selectedPatientModal.sex}</div>
+                    <div><strong>Birthday:</strong> {new Date(selectedPatientModal.birthday).toLocaleDateString()}</div>
+                    <div><strong>Registration:</strong> {new Date(selectedPatientModal.registration_date).toLocaleDateString()}</div>
+                  </div>
+                </div>
 
+                <div className="healthcare-modal-section">
+                  <h4>Contact Information</h4>
+                  <div className="healthcare-modal-grid">
+                    <div><strong>Phone:</strong> {selectedPatientModal.contact_no}</div>
+                    <div><strong>Email:</strong> {selectedPatientModal.email}</div>
+                    <div><strong>Address:</strong> {selectedPatientModal.address}</div>
+                  </div>
+                </div>
 
-      res.json({
-        success: true,
-        message: 'QR code generated and sent successfully to ' + patientEmail,
-        qrCodeDataURL: qrCodeDataURL
-      });
+                {selectedPatientModal.emergencyContact && selectedPatientModal.emergencyContact.length > 0 && (
+                  <div className="healthcare-modal-section">
+                    <h4>Emergency Contact</h4>
+                    <div className="healthcare-modal-grid">
+                      <div><strong>Name:</strong> {selectedPatientModal.emergencyContact[0].name}</div>
+                      <div><strong>Relationship:</strong> {selectedPatientModal.emergencyContact[0].relationship}</div>
+                      <div><strong>Phone:</strong> {selectedPatientModal.emergencyContact[0].contact_number}</div>
+                    </div>
+                  </div>
+                )}
 
+                <div className="healthcare-modal-actions">
+                  <button 
+                    className="healthcare-modal-btn primary"
+                    onClick={() => {
+                      setSelectedPatientModal(null);
+                      fetchPatientHistory(selectedPatientModal.patient_id);
+                      setCurrentPage('patients');
+                    }}
+                  >
+                    View Medical History
+                  </button>
+                  <button 
+                    className="healthcare-modal-btn"
+                    onClick={() => setSelectedPatientModal(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
-    } catch (error) {
-      console.error('💥 Unexpected error in QR generation:', error);
-      res.status(500).json({
-        error: 'Internal server error',
-        details: error.message
-      });
+  const renderCurrentPage = () => {
+    if (currentPage === 'overview') {
+      return renderOverview();
+    } else if (currentPage === 'patients') {
+      return renderMyPatientsPage();
+    } else if (currentPage === 'overall-patients') {
+      return renderOverallPatientsPage();
+    } else if (currentPage === 'lab-orders') {
+      return renderLabOrdersPage();
     }
-  });
-
-
-  // GET /api/temp-registration/:tempPatientId - Get registration details for QR display
-  app.get('/api/temp-registration/:tempPatientId', async (req, res) => {
-    try {
-      const { tempPatientId } = req.params;
-      
-      const { data: regData, error: regError } = await supabase
-        .from('tempReg')
-        .select('temp_id, temp_patient_id, name, email, symptoms, duration, severity, preferred_date, preferred_time_slot, scheduled_date, status, qr_code')
-        .eq('temp_patient_id', tempPatientId)
-        .single();
-      
-      if (regError || !regData) {
-        return res.status(404).json({
-          error: 'Registration not found'
-        });
-      }
-      
-      res.json({
-        success: true,
-        data: regData
-      });
-      
-    } catch (error) {
-      console.error('💥 Get registration error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve registration details',
-        details: error.message
-      });
-    }
-  });
-
-
-  // Health Check
-  app.get('/api/health', (req, res) => {
-    res.status(200).json({
-      status: 'OK',
-      message: 'CliCare Admin Backend is running',
-      timestamp: new Date().toISOString(),
-      env: {
-        emailConfigured: !!process.env.EMAIL_USER,
-        smsConfigured: isSMSConfigured,
-        supabaseConfigured: !!SUPABASE_URL,
-        smsProvider: 'iTexMo'
-      }
-    });
-  });
-
-
-  // Test email endpoint (remove after testing)
-  app.post('/api/test-email', async (req, res) => {
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD
-        }
-      });
-      
-      await transporter.verify();
-      
-      const result = await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_USER, // Send to yourself
-        subject: 'CliCare Email Test',
-        text: 'Email configuration is working!'
-      });
-      
-      res.json({ success: true, messageId: result.messageId });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-
-  // Get Patient Profile
-  app.get('/api/patient/profile', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'outpatient') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { data: patientData, error: patientError } = await supabase
-        .from('outPatient')
-        .select(`
-          *,
-          emergencyContact(
-            name,
-            contact_number,
-            relationship
-          )
-        `)
-        .eq('patient_id', req.user.patientId)
-        .single();
-
-
-      if (patientError || !patientData) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
-
-
-      res.status(200).json({
-        success: true,
-        patient: patientData
-      });
-
-
-    } catch (error) {
-      console.error('Patient profile error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Get Patient Visit History
-  app.get('/api/patient/history/:patientId', authenticateToken, async (req, res) => {
-    try {
-      if (req.user.type !== 'outpatient') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-
-      const { patientId } = req.params;
-      
-      // Get patient internal ID
-      const { data: patientData } = await supabase
-        .from('outPatient')
-        .select('id')
-        .eq('patient_id', patientId)
-        .single();
-
-
-      if (!patientData) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
-
-
-      // Get visit history
-      const { data: visitHistory, error: visitError } = await supabase
-        .from('visit')
-        .select(`
-          visit_id,
-          visit_date,
-          visit_time,
-          appointment_type,
-          symptoms,
-          diagnosis(
-            diagnosis_description,
-            severity
-          ),
-          queue(
-            queue_no,
-            status,
-            department(name)
-          )
-        `)
-        .eq('patient_id', patientData.id)
-        .order('visit_date', { ascending: false });
-
-
-      res.status(200).json({
-        success: true,
-        visitHistory: visitHistory || []
-      });
-
-
-    } catch (error) {
-      console.error('Patient history error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-
-  // Start Server
-  app.listen(PORT, () => {
-    console.log(`🚀 CliCare Backend Server running on port ${PORT}`);
-    console.log(`📧 Email OTP: ${emailConfig.auth.user ? '✅ Configured' : '❌ Not configured'}`);
-    console.log(`📱 SMS OTP: ${isSMSConfigured ? '✅ iTexMo configured' : '❌ Not configured'}`);
-    console.log(`🗄️ Database: ${SUPABASE_URL ? '✅ Connected' : '❌ Not connected'}`);
-  });
-
-
-
-
-// Get lab requests (Doctor side) - FIXED VERSION
-app.get('/api/healthcare/lab-requests', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { data: labRequests, error: labRequestsError } = await supabase
-      .from('labRequest')
-      .select(`
-        *,
-        visit!inner(
-          visit_id,
-          visit_date,
-          outPatient!inner(
-            patient_id,
-            name,
-            age,
-            sex,
-            contact_no
-          )
-        ),
-        labResult(
-          result_id,
-          file_path,
-          upload_date,
-          results
-        )
-      `)
-      .eq('staff_id', req.user.id)  // Fixed: use staff_id instead of healthstaff_id
-      .order('request_id', { ascending: false });
-
-
-    if (labRequestsError) {
-      console.error('Lab requests fetch error:', labRequestsError);
-      return res.status(500).json({ error: 'Failed to fetch lab requests' });
-    }
-
-
-    // Format the data for the frontend
-    const formattedRequests = labRequests.map(request => ({
-      request_id: request.request_id,
-      test_name: request.test_type,
-      test_type: request.test_type,
-      priority: 'normal',
-      status: request.status,
-      instructions: '',
-      due_date: request.due_date,
-      created_at: request.visit.visit_date,
-      patient: {
-        patient_id: request.visit.outPatient.patient_id,
-        name: request.visit.outPatient.name,
-        age: request.visit.outPatient.age,
-        sex: request.visit.outPatient.sex,
-        contact_no: request.visit.outPatient.contact_no
-      },
-      labResult: request.labResult?.[0] ? {
-        result_id: request.labResult[0].result_id,
-        file_name: request.labResult[0].file_path ? request.labResult[0].file_path.split('/').pop() : null,
-        file_url: request.labResult[0].file_path,
-        upload_date: request.labResult[0].upload_date,
-        results: request.labResult[0].results
-      } : null
-    }));
-
-
-    res.status(200).json({
-      success: true,
-      labRequests: formattedRequests
-    });
-
-
-  } catch (error) {
-    console.error('Get lab requests error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-// Get lab results (Doctor side) - FIXED VERSION
-app.get('/api/healthcare/lab-results', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    // Get lab results for requests made by this doctor
-    const { data: labResults, error: labResultsError } = await supabase
-      .from('labResult')
-      .select(`
-        *,
-        labRequest!inner(
-          request_id,
-          test_type,
-          staff_id,
-          visit!inner(
-            visit_id,
-            visit_date,
-            outPatient!inner(
-              patient_id,
-              name,
-              age,
-              sex,
-              contact_no
-            )
-          )
-        )
-      `)
-      .eq('labRequest.staff_id', req.user.id)  // Fixed: use staff_id instead of healthstaff_id
-      .order('upload_date', { ascending: false });
-
-
-    if (labResultsError) {
-      console.error('Lab results fetch error:', labResultsError);
-      return res.status(500).json({ error: 'Failed to fetch lab results' });
-    }
-
-
-    // Format the results for frontend
-    const formattedResults = (labResults || []).map(result => ({
-      result_id: result.result_id,
-      request_id: result.request_id,
-      file_name: result.file_path ? result.file_path.split('/').pop() : 'Unknown File',
-      file_url: result.file_path,
-      upload_date: result.upload_date,
-      results: result.results,
-      interpretation: result.interpretation,
-      test_type: result.labRequest.test_type,
-      patient: {
-        patient_id: result.labRequest.visit.outPatient.patient_id,
-        name: result.labRequest.visit.outPatient.name,
-        age: result.labRequest.visit.outPatient.age,
-        sex: result.labRequest.visit.outPatient.sex,
-        contact_no: result.labRequest.visit.outPatient.contact_no
-      },
-      visit_date: result.labRequest.visit.visit_date
-    }));
-
-
-    res.status(200).json({
-      success: true,
-      labResults: formattedResults
-    });
-
-
-  } catch (error) {
-    console.error('Get lab results error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-// Get lab requests for patient (Patient side) - SIMPLIFIED VERSION
-app.get('/api/patient/lab-requests/:patientId', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'outpatient') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { patientId } = req.params;
-
-
-    // Verify patient identity
-    if (req.user.patientId !== patientId) {
-      return res.status(403).json({ error: 'Access denied to other patient data' });
-    }
-
-
-    // Get patient internal ID
-    const { data: patientData } = await supabase
-      .from('outPatient')
-      .select('id, patient_id, name')
-      .eq('patient_id', patientId)
-      .single();
-
-
-    if (!patientData) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-
-    // Get patient's visits first
-    const { data: visits } = await supabase
-      .from('visit')
-      .select('visit_id')
-      .eq('patient_id', patientData.id);
-
-
-    if (!visits || visits.length === 0) {
-      return res.status(200).json({
-        success: true,
-        labRequests: []
-      });
-    }
-
-
-    const visitIds = visits.map(v => v.visit_id);
-
-
-    // Get lab requests for patient's visits
-    const { data: labRequests, error: labRequestsError } = await supabase
-      .from('labRequest')
-      .select(`
-        *,
-        visit!inner(visit_id, visit_date),
-        healthStaff!staff_id!inner(name, specialization)
-      `)
-      .in('visit_id', visitIds)
-      .order('request_id', { ascending: false });
-
-
-    if (labRequestsError) {
-      console.error('Patient lab requests fetch error:', labRequestsError);
-      return res.status(500).json({ error: 'Failed to fetch lab requests' });
-    }
-
-
-    // Get lab results separately
-    const labRequestIds = labRequests.map(req => req.request_id);
-    let labResults = [];
     
-    if (labRequestIds.length > 0) {
-      const { data: resultsData } = await supabase
-        .from('labResult')
-        .select('*')
-        .eq('patient_id', patientData.id)
-        .in('request_id', labRequestIds);
-      
-      labResults = resultsData || [];
+    const menuItems = getMenuItems();
+    const currentItem = menuItems.find(item => item.id === currentPage);
+    
+    if (currentItem) {
+      return renderPlaceholderPage(currentItem.label, currentItem.description);
     }
-
-
-    // Format data for patient dashboard
-    const formattedRequests = labRequests.map(request => {
-      const labResult = labResults.find(result => result.request_id === request.request_id);
-      
-      return {
-        request_id: request.request_id,
-        test_name: request.test_type,
-        test_type: request.test_type,
-        priority: 'normal',
-        status: request.status,
-        instructions: '',
-        due_date: request.due_date,
-        created_at: request.visit.visit_date,
-        doctor: {
-          name: request.healthStaff.name,
-          department: request.healthStaff.specialization
-        },
-        labResult: labResult ? {
-          result_id: labResult.result_id,
-          file_name: labResult.file_path ? labResult.file_path.split('/').pop() : 'Uploaded File',
-          file_url: labResult.file_path,
-          upload_date: labResult.upload_date,
-          results: labResult.results
-        } : null
-      };
-    });
-
-
-    res.status(200).json({
-      success: true,
-      labRequests: formattedRequests
-    });
-
-
-  } catch (error) {
-    console.error('Get patient lab requests error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message 
-    });
-  }
-});
-
-
-// Update the lab result upload endpoint to link medical records
-app.post('/api/patient/upload-lab-result', authenticateToken, upload.single('labResultFile'), async (req, res) => {
-  try {
-    if (req.user.type !== 'outpatient') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { labRequestId, patientId } = req.body;
-    const file = req.file;
-
-
-    if (!file || !labRequestId || !patientId) {
-      return res.status(400).json({ error: 'File, lab request ID and patient ID are required' });
-    }
-
-
-    if (req.user.patientId !== patientId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { data: patientData } = await supabase
-      .from('outPatient')
-      .select('id, patient_id')
-      .eq('patient_id', patientId)
-      .single();
-
-
-    if (!patientData) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-
-    // Get lab request with visit info
-    const { data: labRequestData } = await supabase
-      .from('labRequest')
-      .select('request_id, visit_id, status')
-      .eq('request_id', labRequestId)
-      .single();
-
-
-    if (!labRequestData) {
-      return res.status(404).json({ error: 'Lab request not found' });
-    }
-
-
-    const filePath = `/uploads/lab-results/${file.filename}`;
-
-
-    // Save lab result
-    const { data: labResultData, error: labResultError } = await supabase
-      .from('labResult')
-      .insert({
-        request_id: parseInt(labRequestId),
-        patient_id: patientData.id,
-        file_path: filePath,
-        upload_date: new Date().toISOString().split('T')[0],
-        results: JSON.stringify({
-          originalName: file.originalname,
-          size: file.size,
-          mimeType: file.mimetype
-        })
-      })
-      .select()
-      .single();
-
-
-    if (labResultError) {
-      console.error('Lab result save error:', labResultError);
-      return res.status(500).json({ error: 'Failed to save lab result' });
-    }
-
-
-    // Update lab request status
-    await supabase
-      .from('labRequest')
-      .update({ status: 'completed' })
-      .eq('request_id', labRequestId);
-
-
-    // Update or create medical record with lab result
-    const { data: existingMedicalRecord } = await supabase
-      .from('medicalRecord')
-      .select('record_id')
-      .eq('patient_id', patientData.id)
-      .eq('visit_id', labRequestData.visit_id)
-      .single();
-
-
-    if (existingMedicalRecord) {
-      // Update existing medical record
-      await supabase
-        .from('medicalRecord')
-        .update({ 
-          result_id: labResultData.result_id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('record_id', existingMedicalRecord.record_id);
-    } else {
-      // Create new medical record
-      await supabase
-        .from('medicalRecord')
-        .insert({
-          patient_id: patientData.id,
-          visit_id: labRequestData.visit_id,
-          result_id: labResultData.result_id
-        });
-    }
-
-
-    res.status(201).json({
-      success: true,
-      labResult: {
-        result_id: labResultData.result_id,
-        file_name: file.originalname,
-        file_url: filePath,
-        upload_date: labResultData.upload_date
-      },
-      message: 'Lab result uploaded and medical record updated successfully'
-    });
-
-
-  } catch (error) {
-    console.error('Upload lab result error:', error);
-    res.status(500).json({ error: 'Internal server error during file upload' });
-  }
-});
-
-
-  // Get patients in queue and completed consultations for doctor (Healthcare dashboard)
-app.get('/api/healthcare/my-patients-queue', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { date } = req.query;
-    const today = new Date().toISOString().split('T')[0];
-    const filterDate = date || today;
-
-
-    // Get doctor's department
-    const { data: staffData } = await supabase
-      .from('healthStaff')
-      .select('department_id, specialization')
-      .eq('id', req.user.id)
-      .single();
-
-
-    if (!staffData) {
-      return res.status(404).json({ error: 'Staff not found' });
-    }
-
-
-    // Fetch patients currently in queue (waiting/in_progress) for this department
-    const { data: queuePatients, error: queueError } = await supabase
-      .from('queue')
-      .select(`
-        queue_id,
-        queue_no,
-        status,
-        created_time,
-        visit!inner(
-          visit_id,
-          visit_date,
-          visit_time,
-          symptoms,
-          appointment_type,
-          outPatient!inner(
-            id,
-            patient_id,
-            name,
-            age,
-            sex,
-            contact_no,
-            email
-          )
-        )
-      `)
-      .eq('department_id', staffData.department_id)
-      .in('status', ['waiting', 'in_progress'])
-      .eq('visit.visit_date', filterDate)
-      .order('queue_no', { ascending: true });
-
-
-    // Fetch patients who completed consultation with this doctor today
-    const { data: completedPatients, error: completedError } = await supabase
-      .from('diagnosis')
-      .select(`
-        created_at,
-        visit!inner(
-          visit_id,
-          visit_date,
-          visit_time,
-          symptoms,
-          appointment_type,
-          outPatient!inner(
-            id,
-            patient_id,
-            name,
-            age,
-            sex,
-            contact_no,
-            email
-          ),
-          queue!inner(
-            status,
-            queue_no,
-            department_id
-          )
-        )
-      `)
-      .eq('healthstaff_id', req.user.id)
-      .eq('visit.visit_date', filterDate)
-      .eq('visit.queue.department_id', staffData.department_id)
-      .eq('visit.queue.status', 'completed')
-      .order('created_at', { ascending: false });
-
-
-    // Combine and format the data
-    let allPatients = [];
-
-
-    // Add queue patients (waiting/in_progress)
-    if (queuePatients && !queueError) {
-      queuePatients.forEach(item => {
-        allPatients.push({
-          patient_id: item.visit.outPatient.patient_id,
-          name: item.visit.outPatient.name,
-          age: item.visit.outPatient.age,
-          sex: item.visit.outPatient.sex,
-          contact_no: item.visit.outPatient.contact_no,
-          email: item.visit.outPatient.email,
-          lastVisit: item.visit.visit_date,
-          lastSymptoms: item.visit.symptoms,
-          queueStatus: item.status,
-          queueNumber: item.queue_no,
-          visitTime: item.visit.visit_time,
-          isInQueue: true
-        });
-      });
-    }
-
-
-    // Add completed patients (avoid duplicates)
-    if (completedPatients && !completedError) {
-      completedPatients.forEach(item => {
-        const patientId = item.visit.outPatient.patient_id;
-        // Check if patient is not already in the list
-        if (!allPatients.find(p => p.patient_id === patientId)) {
-          allPatients.push({
-            patient_id: patientId,
-            name: item.visit.outPatient.name,
-            age: item.visit.outPatient.age,
-            sex: item.visit.outPatient.sex,
-            contact_no: item.visit.outPatient.contact_no,
-            email: item.visit.outPatient.email,
-            lastVisit: item.visit.visit_date,
-            lastSymptoms: item.visit.symptoms,
-            queueStatus: 'completed',
-            queueNumber: item.visit.queue[0]?.queue_no,
-            visitTime: item.visit.visit_time,
-            isInQueue: false
-          });
-        }
-      });
-    }
-
-
-    res.status(200).json({
-      success: true,
-      patients: allPatients,
-      department: {
-        id: staffData.department_id,
-        specialization: staffData.specialization
-      }
-    });
-
-
-  } catch (error) {
-    console.error('My patients queue error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-// Create lab request (Doctor side)
-app.post('/api/healthcare/lab-requests', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { patient_id, test_name, test_type, priority, instructions, due_date } = req.body;
-
-
-    if (!patient_id || !test_name || !test_type) {
-      return res.status(400).json({ error: 'Patient ID, test name, and test type are required' });
-    }
-
-
-    // Get patient internal ID
-    const { data: patientData } = await supabase
-      .from('outPatient')
-      .select('id, patient_id, name')
-      .eq('patient_id', patient_id)
-      .single();
-
-
-    if (!patientData) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-
-    // Get or create a visit for today
-    const today = new Date().toISOString().split('T')[0];
-    let { data: visitData } = await supabase
-      .from('visit')
-      .select('visit_id')
-      .eq('patient_id', patientData.id)
-      .eq('visit_date', today)
-      .single();
-
-
-    if (!visitData) {
-      // Create a new visit if none exists for today
-      const { data: newVisit, error: visitError } = await supabase
-        .from('visit')
-        .insert({
-          patient_id: patientData.id,
-          visit_date: today,
-          visit_time: new Date().toTimeString().split(' ')[0],
-          appointment_type: 'Lab Request',
-          symptoms: 'Lab test requested'
-        })
-        .select()
-        .single();
-
-
-      if (visitError) {
-        return res.status(500).json({ error: 'Failed to create visit record' });
-      }
-      visitData = newVisit;
-    }
-
-
-    // Create lab request
-    const { data: labRequestData, error: labRequestError } = await supabase
-      .from('labRequest')
-      .insert({
-        visit_id: visitData.visit_id,
-        staff_id: req.user.id,
-        test_type: test_type,
-        due_date: due_date,
-        status: 'pending'
-      })
-      .select()
-      .single();
-
-
-    if (labRequestError) {
-      console.error('Lab request creation error:', labRequestError);
-      return res.status(500).json({ error: 'Failed to create lab request' });
-    }
-
-
-    res.status(201).json({
-      success: true,
-      labRequest: labRequestData,
-      message: 'Lab request created successfully'
-    });
-
-
-  } catch (error) {
-    console.error('Create lab request error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-// Add this after your existing middleware setup
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-
-// Add CORS headers for file serving
-app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
-
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large' });
-    }
-  }
-  
-  console.error('Unhandled error:', error);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    details: error.message 
-  });
-});
-
-
-// Create diagnosis and medical record
-app.post('/api/healthcare/diagnosis', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { 
-      visit_id, 
-      patient_id, 
-      diagnosis_code, 
-      diagnosis_description, 
-      diagnosis_type, 
-      severity, 
-      notes,
-      result_id 
-    } = req.body;
-
-
-    if (!visit_id || !patient_id || !diagnosis_description) {
-      return res.status(400).json({ error: 'Visit ID, patient ID, and diagnosis description are required' });
-    }
-
-
-    // Get patient internal ID
-    const { data: patientData } = await supabase
-      .from('outPatient')
-      .select('id')
-      .eq('patient_id', patient_id)
-      .single();
-
-
-    if (!patientData) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-
-    // Create diagnosis record
-    const { data: diagnosisData, error: diagnosisError } = await supabase
-      .from('diagnosis')
-      .insert({
-        visit_id: parseInt(visit_id),
-        patient_id: patientData.id,
-        healthstaff_id: req.user.id,
-        diagnosis_code,
-        diagnosis_description,
-        diagnosis_type: diagnosis_type || 'primary',
-        severity: severity || 'moderate',
-        notes
-      })
-      .select()
-      .single();
-
-
-    if (diagnosisError) {
-      console.error('Diagnosis creation error:', diagnosisError);
-      return res.status(500).json({ error: 'Failed to create diagnosis' });
-    }
-
-
-    // Create medical record entry
-    const { data: medicalRecordData, error: medicalRecordError } = await supabase
-      .from('medicalRecord')
-      .insert({
-        patient_id: patientData.id,
-        visit_id: parseInt(visit_id),
-        result_id: result_id ? parseInt(result_id) : null
-      })
-      .select()
-      .single();
-
-
-    if (medicalRecordError) {
-      console.error('Medical record creation error:', medicalRecordError);
-      // Don't fail the request if medical record creation fails
-      console.warn('Medical record not created, but diagnosis was successful');
-    }
-
-
-    res.status(201).json({
-      success: true,
-      diagnosis: diagnosisData,
-      medicalRecord: medicalRecordData,
-      message: 'Diagnosis and medical record created successfully'
-    });
-
-
-  } catch (error) {
-    console.error('Create diagnosis error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-// Get complete medical records for a patient
-app.get('/api/healthcare/medical-records/:patientId', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-
-    const { patientId } = req.params;
-
-
-    // Get patient internal ID
-    const { data: patientData } = await supabase
-      .from('outPatient')
-      .select('id, patient_id, name')
-      .eq('patient_id', patientId)
-      .single();
-
-
-    if (!patientData) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-
-    // Get complete medical records
-    const { data: medicalRecords, error: medicalRecordsError } = await supabase
-      .from('medicalRecord')
-      .select(`
-        *,
-        visit!inner(
-          visit_id,
-          visit_date,
-          visit_time,
-          appointment_type,
-          symptoms
-        ),
-        labResult(
-          result_id,
-          file_path,
-          upload_date,
-          results,
-          interpretation
-        )
-      `)
-      .eq('patient_id', patientData.id)
-      .order('created_at', { ascending: false });
-
-
-    if (medicalRecordsError) {
-      console.error('Medical records fetch error:', medicalRecordsError);
-      return res.status(500).json({ error: 'Failed to fetch medical records' });
-    }
-
-
-    res.status(200).json({
-      success: true,
-      patient: {
-        id: patientData.id,
-        patient_id: patientData.patient_id,
-        name: patientData.name
-      },
-      medicalRecords: medicalRecords || []
-    });
-
-
-  } catch (error) {
-    console.error('Get medical records error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-  module.exports = app;
+    
+    return renderOverview();
+  };
+
+  return (
+    <div className="healthcare-dashboard">
+      {/* Mobile Header */}
+      <div className="healthcare-mobile-header">
+        <button 
+          className="healthcare-sidebar-toggle"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+        >
+          ☰
+        </button>
+        <div className="healthcare-mobile-logo">
+          <span className="healthcare-mobile-icon">🏥</span>
+          <span className="healthcare-mobile-title">CLICARE Healthcare</span>
+        </div>
+        <button className="healthcare-mobile-logout" onClick={handleLogout}>
+          🚪
+        </button>
+      </div>
+
+      {/* Sidebar */}
+      <div className={`healthcare-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="healthcare-sidebar-header">
+          <div className="healthcare-sidebar-logo">
+            <span className="healthcare-sidebar-icon">🏥</span>
+            <div className="healthcare-sidebar-text">
+              <h1>CLICARE</h1>
+              <p>Healthcare Portal</p>
+            </div>
+          </div>
+          <button 
+            className="healthcare-sidebar-close"
+            onClick={() => setSidebarOpen(false)}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="healthcare-user-info">
+          <div className="healthcare-user-avatar">👨‍⚕️</div>
+          <div className="healthcare-user-details">
+            <div className="healthcare-user-name">{staffInfo.name}</div>
+            <div className="healthcare-user-role">{staffInfo.role}</div>
+            <div className="healthcare-user-department">{staffInfo.department}</div>
+            <div className="healthcare-user-id">{staffInfo.staffId}</div>
+          </div>
+        </div>
+
+        <nav className="healthcare-navigation">
+          {getMenuItems().map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setCurrentPage(item.id);
+                setSidebarOpen(false);
+              }}
+              className={`healthcare-nav-item ${currentPage === item.id ? 'active' : ''}`}
+            >
+              <span className="healthcare-nav-icon">{item.icon}</span>
+              <div className="healthcare-nav-content">
+                <div className="healthcare-nav-label">{item.label}</div>
+                <div className="healthcare-nav-description">{item.description}</div>
+              </div>
+            </button>
+          ))}
+        </nav>
+
+        <div className="healthcare-sidebar-footer">
+          <button onClick={handleLogout} className="healthcare-logout-btn">
+            <span>🚪</span>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="healthcare-sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* Main Content */}
+      <div className="healthcare-main-content">
+        {renderCurrentPage()}
+      </div>
+    </div>
+  );
+};
+
+export default HealthcareDashboard;
