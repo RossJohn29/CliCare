@@ -1,6 +1,6 @@
-// terminalpatientregistration.js
+// mobilepatientregistration.js
 import React, { useState, useEffect } from 'react';
-import './terminalpatientregistration.css';
+import './mobilepatientregistration.css';
 import sampleID from "../../sampleID.png";
 import {
   processIDWithOCR,
@@ -10,49 +10,7 @@ import {
   captureImageFromVideo
 } from '../../services/tesseractOCR';
 
-const TerminalPatientRegistration = () => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [patientType, setPatientType] = useState('new');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [idScanMode, setIdScanMode] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [showValidation, setShowValidation] = useState(false);
-  const [showCameraModal, setShowCameraModal] = useState(false);
-  const [cameraStream, setCameraStream] = useState(null);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [outpatientSymptoms, setOutpatientSymptoms] = useState([]);
-  const [symptomsLoading, setSymptomsLoading] = useState(true);
-
-  const [patientData, setPatientData] = useState({
-    patient_id: '',
-    name: '',
-    birthday: '',
-    age: '',
-    sex: '',
-    address: '',
-    contact_no: '',
-    email: '',
-    registration_date: '',
-    emergency_contact_name: '',
-    emergency_contact_relationship: '',
-    emergency_contact_no: '',
-    selectedSymptoms: [],
-    preferredTime: '',
-    duration: '',
-    severity: '',
-    previousTreatment: '',
-    allergies: '',
-    medications: '',
-    preferredDate: '',
-    appointmentTime: ''
-  });
-
-  // Form data (new patients)
+const MobilePatientRegistration = () => {
   const [formData, setFormData] = useState({
     fullName: '',
     sex: '',
@@ -61,171 +19,186 @@ const TerminalPatientRegistration = () => {
     address: '',
     contactNumber: '',
     email: '',
+    
     emergencyContactName: '',
     emergencyContactNumber: '',
     emergencyRelationship: '',
+    
     idType: '',
-    idNumber: '',
-    selectedSymptoms: [],
-    preferredTime: '',
-    duration: '',
-    severity: '',
-    previousTreatment: '',
-    allergies: '',
-    medications: '',
-    preferredDate: '',
-    appointmentTime: ''
+    idNumber: ''
   });
+  
+  const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [idScanMode, setIdScanMode] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showValidation, setShowValidation] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    const storedPatientType = localStorage.getItem('patientType') || 'new';
-    const storedPatientInfo = localStorage.getItem('patientInfo');
-    setPatientType(storedPatientType);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [currentStep]);
 
-    if (storedPatientType === 'returning' && storedPatientInfo) {
-      try {
-        const patientInfo = JSON.parse(storedPatientInfo);
-        setPatientData({
-          ...patientInfo,
-          selectedSymptoms: [],
-          duration: '',
-          severity: '',
-          previousTreatment: '',
-          allergies: '',
-          medications: '',
-          preferredDate: '',
-          appointmentTime: ''
-        });
-        setCurrentStep(4);
-      } catch (err) {
-        console.error('Error parsing patient info:', err);
-        setError('Error loading patient information. Please try logging in again.');
-      }
-    } else if (storedPatientType === 'new') {
-      setCurrentStep(1);
-    } else {
-      window.location.href = '/terminal-patient-login';
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    let processedValue = value;
+
+    if (['fullName', 'emergencyContactName', 'address'].includes(name)) {
+      processedValue = toTitleCase(value);
+    } else if (name === 'email') {
+      processedValue = value.toLowerCase();
+    } else if (['contactNumber', 'emergencyContactNumber'].includes(name)) {
+      processedValue = formatPhoneNumber(value);
     }
 
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Fetch symptoms
-  useEffect(() => {
-  const fetchSymptoms = async () => {
-    try {
-      setSymptomsLoading(true);
-      console.log('Fetching symptoms from API...');
-      
-      const response = await fetch('http://localhost:5000/api/symptoms');
-      console.log('API Response status:', response.status);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('API Response data:', result);
-        
-        if (result.success && result.symptoms && result.symptoms.length > 0) {
-          setOutpatientSymptoms(result.symptoms);
-          console.log('✅ Symptoms loaded successfully:', result.symptoms.length, 'categories');
-        } else {
-          console.error('❌ No symptoms data in API response');
-          setError('No symptoms found. Please check your database.');
-          setOutpatientSymptoms([]);
-        }
-      } else {
-        console.error('❌ API request failed:', response.status);
-        throw new Error(`API request failed with status ${response.status}`);
+    setFormData(prev => {
+      const updated = { ...prev, [name]: processedValue };
+  
+      if (name === 'birthday') {
+        updated.age = calculateAge(processedValue);
       }
-    } catch (error) {
-      console.error('❌ Error fetching symptoms:', error);
-      setError('Failed to load symptoms from server.');
-      setOutpatientSymptoms([]);
-    } finally {
-      setSymptomsLoading(false);
+      
+      return updated;
+    });
+
+    setError('');
+
+    if (showValidation) {
+      setShowValidation(false);
+      setFieldErrors({});
     }
   };
 
-  fetchSymptoms();
-}, []);
+  const toTitleCase = (str) => {
+    if (!str) return '';
+    return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  };
 
+  const formatPhoneNumber = (value) => {
+    const cleaned = value.replace(/\D/g, '');
+    const limited = cleaned.slice(0, 11);
 
-  // Camera setup/cleanup
+    if (limited.length >= 8) {
+      return limited.replace(/(\d{4})(\d{3})(\d{4})/, '$1-$2-$3');
+    } else if (limited.length >= 5) {
+      return limited.replace(/(\d{4})(\d{1,3})/, '$1-$2');
+    }
+    return limited;
+  };
+
+  const cleanPhoneNumber = (value) => {
+    return value.replace(/\D/g, '');
+  };
+
+  const validatePhoneNumber = (value) => {
+    const cleaned = value.replace(/\D/g, '');
+    
+    if (!cleaned) return 'Contact number is required';
+    if (cleaned.length < 11) return 'Contact number must be 11 digits';
+    if (cleaned.length > 11) return 'Contact number must be exactly 11 digits';
+    if (!cleaned.startsWith('09')) return 'Contact number must start with 09';
+    
+    return null;
+  };
+
+  const validateEmail = (email) => {
+    if (!email) return 'Email address is required';
+    if (!email.includes('@')) return 'Email must contain @';
+    if (!email.match(/\.[a-zA-Z]{2,}$/)) return 'Email must contain a valid domain (e.g., .com, .org)';
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.toLowerCase())) return 'Please enter a valid email format';
+    
+    return null;
+  };
+
+  const validateFullName = (name) => {
+    if (!name.trim()) return 'Full name is required';
+    const words = name.trim().split(/\s+/);
+    if (words.length < 2) return 'Please enter your full name';
+    if (/\./.test(name)) return 'Do not use initials (write full middle name instead)';
+    return null;
+  };
+
+  const validateAddress = (address) => {
+    if (!address.trim()) return 'Complete address is required';
+    const parts = address.split(' ').map(p => p.trim()).filter(Boolean);
+    if (parts.length < 4) {
+      return 'Please follow the format: House No., Street, Barangay, City, Province';
+    }
+    return null;
+  };
+
+  const checkCameraPermissions = async () => {
+    try {
+      const permissions = await navigator.permissions.query({ name: 'camera' });
+      
+      if (permissions.state === 'denied') {
+        setCameraError('Camera access is blocked. Please enable camera permissions in your browser settings and refresh the page.');
+        return false;
+      }
+      
+      return true;
+    } catch (err) {
+      return true;
+    }
+  };
+
+  const handleIDScanClick = () => {
+    setShowCameraModal(true);
+    setCameraError('');
+  };
+
   useEffect(() => {
     if (showCameraModal) {
       initializeCameraStream();
     } else {
       cleanupCameraStream();
     }
+    
     return () => cleanupCameraStream();
   }, [showCameraModal]);
 
-  const registerNewPatient = async (data) => {
-    const response = await fetch('http://localhost:5000/api/patient/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        name: data.fullName,
-        birthday: data.birthday,
-        age: parseInt(data.age),
-        sex: data.sex,
-        address: data.address,
-        contact_no: cleanPhoneNumber(data.contactNumber),
-        email: data.email.toLowerCase(),
-        emergency_contact_name: data.emergencyContactName,
-        emergency_contact_relationship: data.emergencyRelationship,
-        emergency_contact_no: cleanPhoneNumber(data.emergencyContactNumber),
-        symptoms: data.selectedSymptoms
-      })
-    });
-
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Registration failed');
-    return result;
-  };
-
-  const bookAppointmentForReturningPatient = async (data) => {
-    const response = await fetch('http://localhost:5000/api/patient/visit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        patient_id: data.patient_id,
-        symptoms: data.selectedSymptoms.join(', '),
-        duration: data.duration,
-        severity: data.severity,
-        previous_treatment: data.previousTreatment,
-        allergies: data.allergies,
-        medications: data.medications,
-        appointment_type: 'Walk-in Appointment'
-      })
-    });
-
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Appointment booking failed');
-    return result;
-  };
-
-  // Camera Functions
-  const handleIDScanClick = () => {
-    if (!isCameraAvailable()) {
-      setError('Camera scanning requires HTTPS connection. Please contact IT support or enter information manually.');
-      return;
-    }
-    setShowCameraModal(true);
-    setCameraError('');
-  };
-
   const initializeCameraStream = async () => {
-    cleanupCameraStream();
-    try {
+  cleanupCamera();
+
+  try {
       const stream = await initializeCamera();
       setCameraStream(stream);
       setCameraError('');
 
       setTimeout(() => {
-        const video = document.getElementById('camera-feed');
+        const video = document.getElementById('mobile-camera-feed');
         if (video) {
           video.srcObject = stream;
           video.setAttribute('playsinline', '');
@@ -234,10 +207,10 @@ const TerminalPatientRegistration = () => {
           video.play().catch(console.log);
         }
       }, 100);
-    } catch (err) {
-      console.error('Camera access error:', err);
-      setCameraError(err.message);
+    } catch (err) {             
       setCameraStream(null);
+      setCameraError(err.message);
+      throw err;
     }
   };
 
@@ -247,7 +220,7 @@ const TerminalPatientRegistration = () => {
   };
 
   const handleCaptureID = () => {
-    const video = document.getElementById('camera-feed');
+    const video = document.getElementById('mobile-camera-feed');
     const imageData = captureImageFromVideo(video);
     setCapturedImage(imageData);
     processIDImageWithOCR(imageData);
@@ -281,11 +254,201 @@ const TerminalPatientRegistration = () => {
     setCameraError('');
   };
 
+  const validateStep = (step) => {
+    switch (step) {
+      case 1:
+        return (
+          validateFullName(formData.fullName) === null &&
+          formData.sex &&
+          formData.birthday &&
+          validateAddress(formData.address) === null &&
+          validatePhoneNumber(formData.contactNumber) === null &&
+          validateEmail(formData.email) === null
+        );
+      case 2:
+        return (
+          validateFullName(formData.emergencyContactName) === null &&
+          validatePhoneNumber(formData.emergencyContactNumber) === null &&
+          formData.emergencyRelationship &&
+          formData.emergencyContactNumber !== formData.contactNumber
+        );
+      case 3:
+        return (
+          formData.fullName &&
+          formData.sex &&
+          formData.birthday &&
+          formData.address &&
+          formData.contactNumber &&
+          formData.email &&
+          formData.emergencyContactName &&
+          formData.emergencyContactNumber &&
+          formData.emergencyRelationship &&
+          termsAccepted
+        );
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    const stepErrors = {};
+
+    if (currentStep === 1) {
+      if (!formData.fullName.trim()) {
+        stepErrors.fullName = 'Full name is required';
+      } else if (validateFullName(formData.fullName)) {
+        stepErrors.fullName = validateFullName(formData.fullName);
+      }
+
+      if (!formData.sex) stepErrors.sex = 'Select your sex';
+
+      if (!formData.birthday) {
+        stepErrors.birthday = 'Select your date of birth';
+      } else if (validateAge(formData.birthday)) {
+        stepErrors.birthday = validateAge(formData.birthday);
+      }
+
+      if (!formData.address.trim()) {
+        stepErrors.address = 'Complete address is required';
+      } else if (validateAddress(formData.address)) {
+        stepErrors.address = validateAddress(formData.address);
+      }
+
+      if (!formData.contactNumber) {
+        stepErrors.contactNumber = 'Contact number is required';
+      } else if (validatePhoneNumber(formData.contactNumber)) {
+        stepErrors.contactNumber = validatePhoneNumber(formData.contactNumber);
+      }
+
+      if (!formData.email) {
+        stepErrors.email = 'Email address is required';
+      } else if (validateEmail(formData.email)) {
+        stepErrors.email = validateEmail(formData.email);
+      }
+    }
+
+    if (currentStep === 2) {
+      if (!formData.emergencyContactName.trim()) {
+        stepErrors.emergencyContactName = 'Emergency contact name is required';
+      } else if (validateFullName(formData.emergencyContactName)) {
+        stepErrors.emergencyContactName = validateFullName(formData.emergencyContactName);
+      }
+
+      if (!formData.emergencyContactNumber) {
+        stepErrors.emergencyContactNumber = 'Emergency contact number is required';
+      } else if (validatePhoneNumber(formData.emergencyContactNumber)) {
+        stepErrors.emergencyContactNumber = validatePhoneNumber(formData.emergencyContactNumber);
+      }
+
+      if (!formData.emergencyRelationship) {
+        stepErrors.emergencyRelationship = 'Select your relationship';
+      }
+
+      if (formData.emergencyContactNumber === formData.contactNumber) {
+        stepErrors.emergencyContactNumber = 'Emergency contact number cannot be the same as patient\'s number';
+      }
+    }
+
+     if (currentStep === 3 && !termsAccepted) {
+      stepErrors.termsAccepted = 'Please accept the terms and conditions';
+    }
+
+    setFieldErrors(stepErrors);
+    setShowValidation(true);
+
+    if (Object.keys(stepErrors).length === 0) {
+      if (currentStep < 3) {
+        setCurrentStep(currentStep + 1);
+        setShowValidation(false);
+        setError('');
+      } else if (currentStep === 3) {
+        handleSubmit();
+      }
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+    setError('');
+  };
+
+  const generatePatientId = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    return `PAT${timestamp}`;
+  };
+
+  const handleSubmit = async () => {
+    if (!termsAccepted) {
+      setShowValidation(true);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const calculatedAge = formData.age || calculateAge(formData.birthday);
+
+      const registrationData = {
+        name: formData.fullName,
+        birthday: formData.birthday,
+        age: parseInt(calculatedAge),
+        sex: formData.sex,
+        address: formData.address,
+        contact_no: cleanPhoneNumber(formData.contactNumber),
+        email: formData.email.toLowerCase(),
+        emergency_contact_name: formData.emergencyContactName,
+        emergency_contact_relationship: formData.emergencyRelationship,
+        emergency_contact_no: cleanPhoneNumber(formData.emergencyContactNumber),
+        preferred_time: new Date().toISOString(),
+        created_date: new Date().toISOString().split('T')[0],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      };
+
+      console.log('Submitting registration data:', registrationData);
+
+      const response = await fetch('http://localhost:5000/api/temp-registration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(registrationData)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed');
+      }
+
+      console.log('Registration successful:', result);
+
+      const tempRegId = result.temp_id;
+      const tempPatientId = result.temp_patient_id;
+
+      sessionStorage.setItem('tempRegId', tempRegId);
+      sessionStorage.setItem('tempPatientId', tempPatientId);
+      sessionStorage.setItem('patientName', formData.fullName);
+      sessionStorage.setItem('patientEmail', formData.email);
+      sessionStorage.setItem('registrationSuccess', 'true');
+
+      window.location.href = '/mobile-health-assessment';
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed. Please check your internet connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const calculateAge = (birthday) => {
     if (!birthday) return '';
     const today = new Date();
     const birthDate = new Date(birthday);
-    
+
     if (birthDate > today) return '';
     
     let years = today.getFullYear() - birthDate.getFullYear();
@@ -302,7 +465,7 @@ const TerminalPatientRegistration = () => {
       years--;
       months += 12;
     }
-  
+
     if (years > 120) return 'invalid';
 
     if (years === 0 && months === 0) {
@@ -314,7 +477,6 @@ const TerminalPatientRegistration = () => {
     }
   };
 
-// Validate Age
 const validateAge = (birthday) => {
   if (!birthday) return 'Date of birth is required';
   const age = calculateAge(birthday);
@@ -323,384 +485,61 @@ const validateAge = (birthday) => {
   return null;
 };
 
-  const toTitleCase = (str) => str ? str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase()) : '';
-  const toLowerCase = (str) => str ? str.toLowerCase() : '';
-
-  const formatPhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '').slice(0, 11);
-    if (cleaned.length >= 8) return cleaned.replace(/(\d{4})(\d{3})(\d{4})/, '$1-$2-$3');
-    if (cleaned.length >= 5) return cleaned.replace(/(\d{4})(\d{1,3})/, '$1-$2');
-    return cleaned;
-  };
-
-  const cleanPhoneNumber = (value) => value.replace(/\D/g, '');
-
-  const formatTime = (date) =>
-    date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-
-  const formatDate = (date) =>
-    date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-  const validatePhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (!cleaned) return 'Contact number is required';
-    if (cleaned.length !== 11) return 'Contact number must be exactly 11 digits';
-    if (!cleaned.startsWith('09')) return 'Contact number must start with 09';
-    return null;
-  };
-
-  const validateEmail = (email) => {
-    if (!email) return 'Email address is required';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toLowerCase())) return 'Please enter a valid email format';
-    return null;
-  };
-
-  const validateFullName = (name) => {
-    if (!name.trim()) return 'Full name is required';
-    const words = name.trim().split(/\s+/);
-    if (words.length < 2) return 'Please enter your full name';
-    if (/\./.test(name)) return 'Do not use initials (write full middle name instead)';
-    return null;
-  };
-
-  const validateAddress = (address) => {
-    if (!address.trim()) return 'Complete address is required';
-    const parts = address.split(' ').map(p => p.trim()).filter(Boolean);
-    if (parts.length < 4) return 'Please follow the format: House No., Street, Barangay, City, Province';
-    return null;
-  };
-
-  const validateStep = (step) => {
-    if (patientType === 'returning') {
-      switch (step) {
-        case 4:
-          return (
-            patientData.patient_id &&
-            patientData.name &&
-            patientData.emergency_contact_name &&
-            patientData.emergency_contact_relationship &&
-            validatePhoneNumber(patientData.emergency_contact_no || '') === null
-          );
-        case 5:
-          return patientData.selectedSymptoms.length > 0;
-        case 6:
-          return patientData.duration && patientData.severity;
-        case 7:
-          return (
-            patientData.selectedSymptoms.length > 0 &&
-            patientData.duration &&
-            patientData.severity &&
-            patientData.emergency_contact_name &&
-            patientData.emergency_contact_relationship &&
-            validatePhoneNumber(patientData.emergency_contact_no || '') === null
-          );
-        default:
-          return true;
-      }
-    } else {
-      switch (step) {
-        case 1:
-          return (
-            validateFullName(formData.fullName) === null &&
-            formData.sex &&
-            formData.birthday &&
-            validateAddress(formData.address) === null &&
-            validatePhoneNumber(formData.contactNumber) === null &&
-            validateEmail(formData.email) === null
-          );
-        case 2:
-          return (
-            validateFullName(formData.emergencyContactName) === null &&
-            validatePhoneNumber(formData.emergencyContactNumber) === null &&
-            formData.emergencyRelationship &&
-            formData.emergencyContactNumber !== formData.contactNumber
-          );
-        case 3:
-          return (
-            formData.fullName &&
-            formData.sex &&
-            formData.birthday &&
-            formData.address &&
-            formData.contactNumber &&
-            formData.email &&
-            formData.emergencyContactName &&
-            formData.emergencyContactNumber &&
-            formData.emergencyRelationship &&
-            termsAccepted
-          );
-        case 4:
-          return formData.selectedSymptoms.length > 0;
-        case 5:
-          return formData.duration && formData.severity;
-        case 6:
-          return (
-            formData.fullName &&
-            formData.selectedSymptoms.length > 0 &&
-            validatePhoneNumber(formData.contactNumber) === null &&
-            validatePhoneNumber(formData.emergencyContactNumber) === null &&
-            validateEmail(formData.email) === null &&
-            termsAccepted
-          );
-        default:
-          return true;
-      }
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    let processedValue = value;
-
-    if (['fullName', 'emergencyContactName', 'address'].includes(name)) {
-      processedValue = toTitleCase(value);
-    } else if (name === 'email') {
-      processedValue = toLowerCase(value);
-    } else if (['contactNumber', 'emergencyContactNumber'].includes(name)) {
-      processedValue = formatPhoneNumber(value);
-    }
-
-    if (showValidation) {
-      setShowValidation(false);
-      setFieldErrors({});
-      setError('');
-    }
-
-    const updateData = (prev) => {
-      const updated = { ...prev, [name]: processedValue };
-      if (name === 'birthday') {
-        updated.age = calculateAge(processedValue);
-      }
-      return updated;
-    };
-
-    patientType === 'returning' ? setPatientData(updateData) : setFormData(updateData);
-  };
-
-  const handleSymptomToggle = (symptom) => {
-    const current = patientType === 'returning' ? patientData : formData;
-    const isSelected = current.selectedSymptoms.includes(symptom);
-    const updatedSymptoms = isSelected
-      ? current.selectedSymptoms.filter(s => s !== symptom)
-      : [...current.selectedSymptoms, symptom];
-
-    if (patientType === 'returning') {
-      setPatientData(prev => ({ ...prev, selectedSymptoms: updatedSymptoms }));
-    } else {
-      setFormData(prev => ({ ...prev, selectedSymptoms: updatedSymptoms }));
-    }
-    setError('');
-  };
-
-  // Navigation Functions
-  const nextStep = () => {
-    const currentData = patientType === 'returning' ? patientData : formData;
-    
-    console.log('Current step:', currentStep);
-    console.log('Patient type:', patientType);
-    console.log('Duration:', currentData.duration);
-    console.log('Severity:', currentData.severity);
-
-    const stepErrors = {};
-
-    if (currentStep === 1) {
-      if (!formData.fullName.trim()) stepErrors.fullName = 'Full name is required';
-      else if (validateFullName(formData.fullName)) stepErrors.fullName = validateFullName(formData.fullName);
-
-      if (!formData.sex) stepErrors.sex = 'Select your sex';
-      
-      if (!formData.birthday) {
-        stepErrors.birthday = 'Select your date of birth';
-      } else if (validateAge(formData.birthday)) {
-        stepErrors.birthday = validateAge(formData.birthday);
-      }
-
-      if (!formData.address.trim()) stepErrors.address = 'Complete address is required';
-      else if (validateAddress(formData.address)) stepErrors.address = validateAddress(formData.address);
-
-      if (!formData.contactNumber) stepErrors.contactNumber = 'Contact number is required';
-      else if (validatePhoneNumber(formData.contactNumber)) stepErrors.contactNumber = validatePhoneNumber(formData.contactNumber);
-
-      if (!formData.email) stepErrors.email = 'Email address is required';
-      else if (validateEmail(formData.email)) stepErrors.email = validateEmail(formData.email);
-    }
-
-    if (currentStep === 2) {
-      if (!formData.emergencyContactName.trim()) stepErrors.emergencyContactName = 'Emergency contact name is required';
-      else if (validateFullName(formData.emergencyContactName)) stepErrors.emergencyContactName = validateFullName(formData.emergencyContactName);
-
-      if (!formData.emergencyContactNumber) stepErrors.emergencyContactNumber = 'Emergency contact number is required';
-      else if (validatePhoneNumber(formData.emergencyContactNumber)) stepErrors.emergencyContactNumber = validatePhoneNumber(formData.emergencyContactNumber);
-
-      if (!formData.emergencyRelationship) stepErrors.emergencyRelationship = 'Select your relationship';
-
-      if (formData.emergencyContactNumber === formData.contactNumber) {
-        stepErrors.emergencyContactNumber = 'Emergency contact number cannot be the same as patient\'s number';
-      }
-    }
-
-    if (currentStep === 3 && !termsAccepted) {
-      stepErrors.termsAccepted = 'Please accept the terms and conditions';
-    }
-
-    if ((patientType === 'new' && currentStep === 5) || (patientType === 'returning' && currentStep === 6)) {
-      if (!currentData.duration) {
-        stepErrors.duration = 'Please select how long you have experienced these symptoms';
-      }
-      if (!currentData.severity) {
-        stepErrors.severity = 'Please select the severity level';
-      }
-    }
-
-    setFieldErrors(stepErrors);
-    setShowValidation(true);
-
-    if (Object.keys(stepErrors).length === 0) {
-      const maxStep = patientType === 'returning' ? 7 : 6;
-      if (currentStep < maxStep) {
-        setCurrentStep(currentStep + 1);
-        setShowValidation(false);
-        setError('');
-      }
-    } else {
-      setError('Please complete all required fields before continuing.');
-      console.log('Validation errors:', stepErrors);
-    }
-  };
-
-  const prevStep = () => {
-    const minStep = patientType === 'returning' ? 4 : 1;
-    if (currentStep > minStep) {
-      setCurrentStep(currentStep - 1);
-      setError('');
-    }
-  };
-
-  const generateDepartmentRecommendation = () => {
-    const currentData = patientType === 'returning' ? patientData : formData;
-    
-    const departmentMapping = {
-      'Chest Pain': 'Cardiology',
-      'Chest Discomfort': 'Cardiology', 
-      'Heart Palpitations': 'Cardiology',
-      'High Blood Pressure': 'Cardiology',
-      'Shortness of Breath': 'Cardiology',
-      'Stomach Ache': currentData.age < 18 ? 'Pediatrics' : 'Internal Medicine',
-      'Fever': 'Internal Medicine',
-      'Headache': 'Internal Medicine',
-      'Fatigue': 'Internal Medicine',
-      'Cough': 'Internal Medicine',
-      'Nausea': 'Internal Medicine',
-      'Vomiting': 'Internal Medicine',
-      'Diarrhea': 'Internal Medicine',
-      'Joint Pain': 'Internal Medicine',
-      'Back Pain': 'Internal Medicine',
-      'Annual Check-up': 'Internal Medicine',
-      'Health Screening': 'Internal Medicine',
-      'Vaccination': 'Internal Medicine'
-    };
-
-  for (const symptom of currentData.selectedSymptoms) {
-    if (departmentMapping[symptom]) {
-      return departmentMapping[symptom];
-    }
-  }
-  
-  return 'Internal Medicine';
-};
-
-  const handleSubmit = async () => {
-    if (!validateStep(currentStep)) {
-      setError('Please complete all required fields');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      if (patientType === 'new') {
-        const result = await registerNewPatient(formData);
-        alert(
-          `✅ Registration completed successfully!\n\nYour Patient ID: ${result.patient.patient_id}\n\n` +
-          'Please save this ID for future visits. You can now log in using this ID and your registered email or phone number.'
-        );
-
-        localStorage.setItem('newPatientId', result.patient.patient_id);
-        localStorage.setItem('newPatientEmail', formData.email);
-        localStorage.setItem('newPatientPhone', formData.contactNumber);
-      } else {
-        const result = await bookAppointmentForReturningPatient(patientData);
-        alert(
-          `✅ Appointment booked successfully!\n\nQueue Number: ${result.queue_number || 'TBD'}\n` +
-          `Department: ${result.department || generateDepartmentRecommendation()}\n` +
-          `Estimated Wait Time: ${result.estimated_wait || 'Will be announced'}`
-        );
-      }
-
-      ['patientType', 'patientInfo', 'patientToken', 'patientId', 'patientName'].forEach(key =>
-        localStorage.removeItem(key)
-      );
-
-      setTimeout(() => {
-        window.location.href = '/terminal-patient-login';
-      }, 2000);
-    } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const renderCameraModal = () => {
     if (!showCameraModal) return null;
-
     return (
-      <div className="terminal-modal-overlay">
-        <div className="terminal-modal terminal-camera-modal">
-          <div className="terminal-modal-header">
+      <div className="mobile-cmodal-overlay" onClick={(e) => e.target === e.currentTarget && closeCameraModal()}>
+        <div className="mobile-cmodal mobile-camera-modal">
+          <div className="mobile-cmodal-header">
             <h3>Scan Philippine ID</h3>
-            <button
+            <button 
               onClick={closeCameraModal}
-              className="terminal-modal-close"
+              className="mobile-cmodal-close"
             >
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
-          <div className="terminal-modal-content">
+          
+          <div className="mobile-cmodal-content">
             {cameraError ? (
-              <div className="terminal-camera-error">
-                <div className="terminal-error-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+              <div className="mobile-camera-error">
+                <div className="mobile-error-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
                 <p dangerouslySetInnerHTML={{ __html: cameraError}} />
-                <div className="terminal-error-actions">
-                  {cameraError.includes('HTTPS') ? (
-                    <button onClick={closeCameraModal} className="terminal-retry-btn">Enter Manually</button>
-                  ) : (
-                    <>
-                      <button onClick={() => {
-                        setCameraError('');
-                        initializeCameraStream();
-                      }} className="terminal-retry-btn">Try Again</button>
-                      <button onClick={closeCameraModal} className="terminal-cancel-btn">Enter Manually</button>
-                    </>
-                  )}
+                <div className="mobile-error-actions">
+                  <button 
+                    onClick={() => {
+                      setCameraError('');
+                      initializeCameraStream();
+                    }}
+                    className="mobile-retry-btn"
+                  >
+                    Try Again
+                  </button>
+                  <button 
+                    onClick={closeCameraModal}
+                    className="mobile-cancel-btn"
+                  >
+                    Enter Manually
+                  </button>
                 </div>
               </div>
             ) : (
               <>
-                <div className="terminal-camera-container">
-                  <video 
-                    id="camera-feed" 
+                <div className="mobile-camera-container">
+                  <video
+                    id="mobile-camera-feed"
                     autoPlay
                     playsInline
+                    webkit-playsinline
                     muted
-                    className="terminal-camera-feed"
+                    className="mobile-camera-feed"
                   />
-                  <div className="terminal-camera-overlay">
-                    <div className="terminal-id-frame">
-                      <div className="terminal-corner tl"></div>
-                      <div className="terminal-corner tr"></div>
-                      <div className="terminal-corner bl"></div>
-                      <div className="terminal-corner br"></div>
+                  <div className="mobile-camera-overlay">
+                    <div className="mobile-id-frame">
+                      <div className="mobile-corner tl"></div>
+                      <div className="mobile-corner tr"></div>
+                      <div className="mobile-corner bl"></div>
+                      <div className="mobile-corner br"></div>
                     </div>
                   </div>
                 </div>
@@ -708,7 +547,7 @@ const validateAge = (birthday) => {
                 <button
                   onClick={handleCaptureID}
                   disabled={ocrLoading || !cameraStream}
-                  className="terminal-capture-btn"
+                  className="mobile-capture-btn"
                 >
                   Capture ID
                 </button>
@@ -720,176 +559,34 @@ const validateAge = (birthday) => {
     );
   };
 
-  const renderProgressBar = () => {
-    const totalSteps = patientType === 'returning' ? 4 : 6;
-    const stepNames = patientType === 'returning'
-      ? ['Personal', 'Symptoms', 'Details', 'Summary']
-      : ['Personal', 'Emergency', 'Review', 'Symptoms', 'Details', 'Summary'];
-    const adjustedStep = patientType === 'returning' ? Math.max(1, currentStep - 3) : currentStep;
-    const stepIcons = patientType === 'returning' ? ['1', '2', '3', '4'] : ['1', '2', '3', '4', '5', '6'];
-
-    return (
-      <div className="terminal-patient-progress-container">
-        <div className="terminal-patient-progress-steps">
-          {stepNames.map((name, index) => {
-            const stepNumber = index + 1;
-            const isActive = stepNumber === adjustedStep;
-            const isCompleted = stepNumber < adjustedStep;
-            const isLast = index === stepNames.length - 1;
-
-            return (
-              <div key={index} className="terminal-patient-progress-step-item">
-                <div className={`terminal-patient-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
-                  <div className="terminal-patient-step-number">
-                    {isCompleted ? <i className="fa-solid fa-check"></i> : stepIcons[index]}
-                  </div>
-                  <div className="terminal-patient-step-label">{name}</div>
-                </div>
-                {!isLast && (
-                  <div className={`terminal-patient-step-connector ${isCompleted ? 'completed' : ''} ${stepNumber === adjustedStep ? 'active' : ''}`}></div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderPatientInfoStep = () => (
-    <div className="terminal-patient-card terminal-patient-step-transition">
-      <div className="terminal-patient-step-header">
-        <div className="terminal-patient-step-icon"><i className="fa-regular fa-user"></i></div>
-        <h3>Patient Information</h3>
-        <p>Your Registered Information</p>
-      </div>
-
-      {error && <div className="terminal-patient-error">{error}</div>}
-
-      <div className="terminal-patient-info-banner">
-        <div className="terminal-patient-info-icon"><i className="fa-solid fa-square-check"></i></div>
-        <div className="terminal-patient-info-content">
-          <h4>Welcome back, {patientData.name}!</h4>
-          <p>Your information is displayed below for verification</p>
-        </div>
-      </div>
-
-      <div className="terminal-patient-readonly-sections">
-        <div className="terminal-patient-readonly-section">
-          <h4><i className="fa-solid fa-user"></i>Personal Information</h4>
-          <div className="terminal-patient-readonly-grid">
-            <div className="terminal-patient-readonly-item">
-              <label>Patient ID:</label>
-              <div className="terminal-patient-readonly-value">{patientData.patient_id}</div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Registration Date:</label>
-              <div className="terminal-patient-readonly-value">
-                {patientData.registration_date ? new Date(patientData.registration_date).toLocaleDateString() : 'Not available'}
-              </div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Full Name:</label>
-              <div className="terminal-patient-readonly-value">{patientData.name}</div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Sex:</label>
-              <div className="terminal-patient-readonly-value">{patientData.sex}</div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Date of Birth:</label>
-              <div className="terminal-patient-readonly-value">
-                {patientData.birthday ? new Date(patientData.birthday).toLocaleDateString() : 'Not available'}
-              </div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Age:</label>
-              <div className="terminal-patient-readonly-value">{patientData.age} years old</div>
-            </div>
-            <div className="terminal-patient-readonly-item full-width">
-              <label>Address:</label>
-              <div className="terminal-patient-readonly-value">{patientData.address}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="terminal-patient-readonly-section">
-          <h4><i className="fa-solid fa-phone"></i>Contact Information</h4>
-          <div className="terminal-patient-readonly-grid">
-            <div className="terminal-patient-readonly-item">
-              <label>Contact Number:</label>
-              <div className="terminal-patient-readonly-value">{patientData.contact_no}</div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Email Address:</label>
-              <div className="terminal-patient-readonly-value">{patientData.email}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="terminal-patient-readonly-section">
-          <h4><i className="fa-solid fa-bell"></i>Emergency Contact</h4>
-          <div className="terminal-patient-readonly-grid">
-            <div className="terminal-patient-readonly-item">
-              <label>Contact Name:</label>
-              <div className="terminal-patient-readonly-value">
-                {patientData.emergency_contact_name || 'Not provided'}
-              </div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Relationship:</label>
-              <div className="terminal-patient-readonly-value">
-                {patientData.emergency_contact_relationship || 'Not provided'}
-              </div>
-            </div>
-            <div className="terminal-patient-readonly-item">
-              <label>Contact Number:</label>
-              <div className="terminal-patient-readonly-value">
-                {patientData.emergency_contact_no || 'Not provided'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {(!patientData.emergency_contact_name || !patientData.emergency_contact_relationship || !patientData.emergency_contact_no) && (
-        <div className="terminal-patient-warning-note">
-          <div className="terminal-patient-warning-icon"><i className="fa-solid fa-triangle-exclamation"></i></div>
-          <div className="terminal-patient-warning-content">
-            <strong>Emergency Contact Required</strong>
-            <p>Your emergency contact information is incomplete. Please visit the reception desk to update this information before continuing.</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   const renderPersonalDetailsStep = () => (
-    <div className="terminal-patient-card terminal-patient-step-transition">
-      <div className="terminal-patient-step-header">
-        <div className="terminal-patient-step-icon"><i className="fa-regular fa-user"></i></div>
+    <div className="mobile-reg-card mobile-step-transition">
+      <div className="mobile-step-header">
+        <div className="mobile-step-icon">
+          <i className="fa-regular fa-user"></i>
+        </div>
         <h3>Personal Information</h3>
         <p>Please provide your basic information</p>
       </div>
 
-      <div className="terminal-patient-input-group">
+      <div className="mobile-input-group">
         <label>Scan ID</label>
-        <div className="terminal-patient-scan-helper">Optional: a shortcut to speed up typing your full name</div>
-        <div className="terminal-patient-id-scan">
+        <div className="mobile-scan-helper">Optional: a shortcut to speed up typing your full name</div>
+        <div className="mobile-id-scan">
           <img src={sampleID} alt="Sample ID" className="sampleID" />
           <button
             onClick={handleIDScanClick}
             disabled={idScanMode || !isCameraAvailable()}
-            className="terminal-patient-id-scan-btn"
+            className="mobile-id-scan-btn"
           >
             {!isCameraAvailable() ? 'Camera Not Available (HTTPS Required)' :
-              idScanMode ? (<><span className="terminal-patient-loading-spinner"></span>Scanning ID...</>) : "Scan ID"}
+              idScanMode ? (<><span className="mobile-loading-spinner"></span>Scanning ID...</>) : "Scan ID"}
           </button>
         </div>
       </div>
 
-      <div className="terminal-patient-form-grid two-column">
-        <div className="terminal-patient-input-group">
+      <div className="mobile-form-grid two-column">
+        <div className="mobile-input-group">
           <label>Full Name</label>
           <input
             type="text"
@@ -897,7 +594,7 @@ const validateAge = (birthday) => {
             value={formData.fullName}
             onChange={handleInputChange}
             placeholder="Enter your complete name"
-            className={`terminal-patient-form-input ${fieldErrors.fullName ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${fieldErrors.fullName ? 'invalid' : ''}`}
             required
           />
           <small className="input-reminder">First Name, Middle Name, Last Name</small>
@@ -906,13 +603,13 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Sex</label>
           <select
             name="sex"
             value={formData.sex}
             onChange={handleInputChange}
-            className={`terminal-patient-form-input ${showValidation && fieldErrors.sex ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${showValidation && fieldErrors.sex ? 'invalid' : ''}`}
             required
           >
             <option value="" disabled hidden>Select sex</option>
@@ -924,14 +621,14 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Date of Birth</label>
           <input
             type="date"
             name="birthday"
             value={formData.birthday}
             onChange={handleInputChange}
-            className={`terminal-patient-form-input ${showValidation && fieldErrors.birthday ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${showValidation && fieldErrors.birthday ? 'invalid' : ''}`}
             max={new Date().toISOString().split('T')[0]}
             required
           />
@@ -940,18 +637,18 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Age</label>
           <input
             type="text"
             value={formData.age ? (typeof formData.age === 'string' && formData.age.includes('old') ? formData.age : `${formData.age} years old`) : ''}
-            className="terminal-patient-form-input"
+            className="mobile-reg-form-input"
             disabled
             placeholder="Auto-fill"
           />
         </div>
 
-        <div className="terminal-patient-input-group full-width">
+        <div className="mobile-input-group full-width">
           <label>Complete Address</label>
           <input
             type="text"
@@ -959,7 +656,7 @@ const validateAge = (birthday) => {
             value={formData.address}
             onChange={handleInputChange}
             placeholder="House No., Street, Barangay, City, Province"
-            className={`terminal-patient-form-input ${fieldErrors.address ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${fieldErrors.address ? 'invalid' : ''}`}
             required
           />
           {fieldErrors.address && (
@@ -967,7 +664,7 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Contact Number</label>
           <input
             type="tel"
@@ -975,7 +672,7 @@ const validateAge = (birthday) => {
             value={formData.contactNumber}
             onChange={handleInputChange}
             placeholder="09XX-XXX-XXXX"
-            className={`terminal-patient-form-input ${fieldErrors.contactNumber ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${fieldErrors.contactNumber ? 'invalid' : ''}`}
             required
           />
           {fieldErrors.contactNumber && (
@@ -983,7 +680,7 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Email Address</label>
           <input
             type="email"
@@ -991,35 +688,39 @@ const validateAge = (birthday) => {
             value={formData.email}
             onChange={handleInputChange}
             placeholder="your.email@example.com"
-            className={`terminal-patient-form-input ${fieldErrors.email ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${fieldErrors.email ? 'invalid' : ''}`}
             required
           />
           {fieldErrors.email && (
             <small className="error-text">{fieldErrors.email}</small>
           )}
-        </div>
+        </div>  
       </div>
     </div>
   );
 
   const renderEmergencyContactStep = () => (
-    <div className="terminal-patient-card terminal-patient-step-transition">
-      <div className="terminal-patient-step-header">
-        <div className="terminal-patient-step-icon"><i className="fa-regular fa-bell"></i></div>
+    <div className="mobile-reg-card mobile-step-transition">
+      <div className="mobile-step-header">
+        <div className="mobile-step-icon">
+          <i className="fa-regular fa-bell"></i>
+        </div>
         <h3>Emergency Contact</h3>
         <p>Provide emergency contact information</p>
       </div>
 
-      <div className="terminal-patient-emergency-banner">
-        <div className="terminal-patient-banner-icon"><i className="fa-solid fa-bell"></i></div>
-        <div className="terminal-patient-banner-content">
+      <div className="mobile-emergency-banner">
+        <div className="mobile-banner-icon">
+          <i className="fa-solid fa-bell"></i>
+        </div>
+        <div className="mobile-banner-content">
           <h4>Important Information</h4>
           <p>This person will be contacted in case of medical emergency</p>
         </div>
       </div>
 
-      <div className="terminal-patient-form-grid">
-        <div className="terminal-patient-input-group">
+      <div className="mobile-form-grid">
+        <div className="mobile-input-group">
           <label>Emergency Contact Name</label>
           <input
             type="text"
@@ -1027,7 +728,7 @@ const validateAge = (birthday) => {
             value={formData.emergencyContactName}
             onChange={handleInputChange}
             placeholder="Full name of emergency contact"
-            className={`terminal-patient-form-input ${fieldErrors.emergencyContactName ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${fieldErrors.emergencyContactName ? 'invalid' : ''}`}
             required
           />
           {fieldErrors.emergencyContactName && (
@@ -1035,7 +736,7 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Contact Number</label>
           <input
             type="tel"
@@ -1043,7 +744,7 @@ const validateAge = (birthday) => {
             value={formData.emergencyContactNumber}
             onChange={handleInputChange}
             placeholder="09XX-XXX-XXXX"
-            className={`terminal-patient-form-input ${fieldErrors.emergencyContactNumber ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${fieldErrors.emergencyContactNumber ? 'invalid' : ''}`}
             required
           />
           {fieldErrors.emergencyContactNumber && (
@@ -1054,13 +755,13 @@ const validateAge = (birthday) => {
           )}
         </div>
 
-        <div className="terminal-patient-input-group">
+        <div className="mobile-input-group">
           <label>Relationship</label>
           <select
             name="emergencyRelationship"
             value={formData.emergencyRelationship}
             onChange={handleInputChange}
-            className={`terminal-patient-form-input ${showValidation && fieldErrors.emergencyRelationship ? 'invalid' : ''}`}
+            className={`mobile-reg-form-input ${showValidation && fieldErrors.emergencyRelationship ? 'invalid' : ''}`}
             required
           >
             <option value="" disabled hidden>Select relationship</option>
@@ -1081,63 +782,81 @@ const validateAge = (birthday) => {
   );
 
   const renderReviewStep = () => (
-    <div className="terminal-patient-card terminal-patient-step-transition">
-      <div className="terminal-patient-step-header">
-        <div className="terminal-patient-step-icon"><i className="fa-regular fa-clipboard"></i></div>
+    <div className="mobile-reg-card mobile-step-transition">
+      <div className="mobile-step-header">
+        <div className="mobile-step-icon">
+          <i className="fa-regular fa-clipboard"></i>
+        </div>
         <h3>Review & Confirm</h3>
-        <p>Please verify all information is correct</p>
+        <p>Please verify your information</p>
       </div>
 
-      <div className="terminal-patient-review-sections">
-        <div className="terminal-patient-review-section">
-          <h4><i className="fa-solid fa-user"></i>Personal Information</h4>
-          <div className="terminal-patient-review-grid">
-            <div className="terminal-patient-review-item">
+      <div className="mobile-review-sections">
+        <div className="mobile-review-section">
+          <h4><i className="fa-solid fa-user"></i> Personal Information</h4>
+          <div className="mobile-review-grid">
+            <div className="mobile-review-item">
               <label>Full Name:</label>
               <span>{formData.fullName}</span>
             </div>
-            <div className="terminal-patient-review-item">
+            <div className="mobile-review-item">
               <label>Age & Sex:</label>
               <span>{formData.age} years old, {formData.sex}</span>
             </div>
-            <div className="terminal-patient-review-item full-width">
-              <label>Address:</label>
-              <span>{formData.address}</span>
-            </div>
-            <div className="terminal-patient-review-item">
+            <div className="mobile-review-item">
               <label>Contact Number:</label>
               <span>{formData.contactNumber}</span>
             </div>
-            <div className="terminal-patient-review-item">
+            <div className="mobile-review-item">
               <label>Email:</label>
               <span>{formData.email}</span>
+            </div>
+            <div className="mobile-review-item full-width">
+              <label>Address:</label>
+              <span>{formData.address}</span>
             </div>
           </div>
         </div>
 
-        <div className="terminal-patient-review-section">
-          <h4><i className="fa-solid fa-bell"></i>Emergency Contact</h4>
-          <div className="terminal-patient-review-grid">
-            <div className="terminal-patient-review-item">
+        <div className="mobile-review-section">
+          <h4><i className="fa-solid fa-bell"></i> Emergency Contact</h4>
+          <div className="mobile-review-grid">
+            <div className="mobile-review-item">
               <label>Name:</label>
               <span>{formData.emergencyContactName}</span>
             </div>
-            <div className="terminal-patient-review-item">
+            <div className="mobile-review-item">
               <label>Number:</label>
               <span>{formData.emergencyContactNumber}</span>
             </div>
-            <div className="terminal-patient-review-item">
+            <div className="mobile-review-item">
               <label>Relationship:</label>
               <span>{formData.emergencyRelationship}</span>
             </div>
           </div>
         </div>
+
+        {formData.idType && (
+          <div className="mobile-review-section">
+            <h4><i className="fa-solid fa-id-card"></i> ID Information</h4>
+            <div className="mobile-review-grid">
+              <div className="mobile-review-item">
+                <label>ID Type:</label>
+                <span>{formData.idType}</span>
+              </div>
+              <div className="mobile-review-item">
+                <label>ID Number:</label>
+                <span>{formData.idNumber}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="terminal-patient-terms">
-        <label className={`terminal-patient-checkbox-label ${showValidation && !termsAccepted ? 'invalid' : ''}`}>
-          <input
-            type="checkbox"
+      <div className="mobile-terms">
+        <label className={`mobile-checkbox-label ${showValidation && fieldErrors.termsAccepted ? 'invalid' : ''}`}>
+          <input 
+            type="checkbox" 
             checked={termsAccepted}
             onChange={(e) => {
               setTermsAccepted(e.target.checked);
@@ -1147,7 +866,7 @@ const validateAge = (birthday) => {
                 setFieldErrors(newErrors);
               }
             }}
-            className={showValidation && !termsAccepted ? 'invalid' : ''}
+            className={showValidation && fieldErrors.termsAccepted ? 'invalid' : ''}
           />
           <span>
             I confirm that all information provided is accurate and I agree to the
@@ -1159,415 +878,117 @@ const validateAge = (birthday) => {
     </div>
   );
 
-  const renderSymptomsStep = () => {
-    const currentData = patientType === 'returning' ? patientData : formData;
+  const renderNavigationButtons = () => {
+    if (currentStep === 3) {
+      return (
+        <div className="mobile-nav-buttons">
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="mobile-nav-btn secondary"
+            disabled={loading}
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+          <button 
+            type="button"
+            onClick={nextStep}
+            disabled={loading}
+            className="mobile-nav-btn submit"
+          >
+            Continue<i className="fa-solid fa-greater-than"></i>
+          </button> 
+        </div>
+      );
+    }
 
     return (
-      <div className="terminal-patient-card terminal-patient-step-transition">
-        <div className="terminal-patient-step-header">
-          <div className="terminal-patient-step-icon"><i className="fa-solid fa-stethoscope"></i></div>
-          <h3>Health Assessment</h3>
-          <p>What brings you to the clinic today?</p>
-        </div>
-
-        {error && <div className="terminal-patient-error">{error}</div>}
-
-        <div className="terminal-patient-symptoms-info">
-          <div className="terminal-patient-info-banner">
-            <div className="terminal-patient-info-icon"><i className="fa-solid fa-stethoscope"></i></div>
-            <div className="terminal-patient-info-content">
-              <h4>Select Your Symptoms</h4>
-              <p>Choose all symptoms or health concerns you're experiencing</p>
-            </div>
-          </div>
-        </div>
-
-        {symptomsLoading ? (
-          <div className="terminal-patient-loading">
-            <span className="terminal-patient-loading-spinner"></span>
-            Loading symptoms...
-          </div>
-        ) : outpatientSymptoms.length === 0 ? (
-          <div className="terminal-patient-error">
-            No symptoms available. Please refresh the page or contact support.
-          </div>
+      <div className="mobile-nav-buttons">
+        {currentStep > 1 ? (
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="mobile-nav-btn secondary"
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
         ) : (
-          <div className="terminal-patient-symptoms-categories">
-            {outpatientSymptoms.map(category => (
-              <div key={category.category} className="terminal-patient-symptom-category">
-                <div className="terminal-patient-category-title">{category.category}</div>
-                <div className="terminal-patient-symptom-grid">
-                  {category.symptoms.map((symptom, index) => (
-                    <button
-                      key={`${category.category}-${symptom}-${index}`}
-                      onClick={() => handleSymptomToggle(symptom)}
-                      className={`terminal-patient-symptom-btn ${currentData.selectedSymptoms.includes(symptom) ? 'selected' : ''}`}
-                    >
-                      <span className="symptom-text">{symptom}</span>
-                      {currentData.selectedSymptoms.includes(symptom) && <span className="check-icon">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => window.location.href = '/mobile-patient-login'}
+            className="mobile-nav-btn home"
+          >
+            <i className="fa-solid fa-less-than"></i>Back to Home
+          </button>
         )}
-
-        {currentData.selectedSymptoms.length > 0 && (
-          <div className="terminal-patient-selected-symptoms">
-            <h4>Selected Symptoms ({currentData.selectedSymptoms.length})</h4>
-            <div className="terminal-patient-selected-list">
-              {currentData.selectedSymptoms.map(symptom => (
-                <div
-                  key={symptom}
-                  className="terminal-patient-selected-symptom"
-                  onClick={() => handleSymptomToggle(symptom)}
-                >
-                  {symptom}
-                  <span className="remove-icon">×</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <button 
+          type="button"
+          onClick={nextStep}
+          className="mobile-nav-btn primary"
+        >
+          Continue<i className="fa-solid fa-greater-than"></i>
+        </button>
       </div>
     );
   };
 
-  const renderDetailsStep = () => {
-    const currentData = patientType === 'returning' ? patientData : formData;
+  const renderProgressBar = () => (
+    <div className="mobile-progress-container">
+      <div className="mobile-progress-steps">
+        {['Personal', 'Emergency', 'Review'].map((name, index) => {
+          const stepNumber = index + 1;
+          const isActive = stepNumber === currentStep;
+          const isCompleted = stepNumber < currentStep;
+          const isLast = index === 2; // Last step (Review)
 
-    return (
-      <div className="terminal-patient-card terminal-patient-step-transition">
-        <div className="terminal-patient-step-header">
-          <div className="terminal-patient-step-icon"><i class="fa-solid fa-list-ul"></i></div>
-          <h3>Additional Details</h3>
-          <p>Help us understand your condition better</p>
-        </div>
-
-        {error && <div className="terminal-patient-error">{error}</div>}
-
-        <div className="terminal-patient-form-grid two-column">
-          <div className="terminal-patient-input-group">
-            <label>How long have you experienced these symptoms?</label>
-            <select
-              name="duration"
-              value={currentData.duration}
-              onChange={handleInputChange}
-              className={`terminal-patient-form-input ${fieldErrors.duration ? 'invalid' : ''}`}
-              required
-            >
-              <option value="">Select duration</option>
-              <option value="Less than 1 day">Less than 1 day</option>
-              <option value="1-3 days">1-3 days</option>
-              <option value="1 week">1 week</option>
-              <option value="2-4 weeks">2-4 weeks</option>
-              <option value="1-3 months">1-3 months</option>
-              <option value="More than 3 months">More than 3 months</option>
-            </select>
-            {showValidation && fieldErrors.duration && (
-              <small className="error-text">{fieldErrors.duration}</small>
-            )}
-          </div>
-
-          <div className="terminal-patient-input-group">
-            <label>Severity Level</label>
-            <select
-              name="severity"
-              value={currentData.severity}
-              onChange={handleInputChange}
-              className={`terminal-patient-form-input ${fieldErrors.severity ? 'invalid' : ''}`}
-              required
-            >
-              <option value="">Select severity</option>
-              <option value="Mild">Mild - Manageable discomfort</option>
-              <option value="Moderate">Moderate - Affects daily activities</option>
-              <option value="Severe">Severe - Significantly impacts life</option>
-              <option value="Critical">Critical - Urgent attention needed</option>
-            </select>
-            {showValidation && fieldErrors.severity && (
-              <small className="error-text">{fieldErrors.severity}</small>
-            )}
-          </div>
-
-          <div className="terminal-patient-input-group full-width">
-            <label>Previous Treatment</label>
-            <textarea
-              name="previousTreatment"
-              value={currentData.previousTreatment}
-              onChange={handleInputChange}
-              placeholder="Any previous treatments or medications tried for this condition"
-              className="terminal-patient-form-input terminal-patient-form-textarea"
-              rows="2"
-            />
-          </div>
-
-          <div className="terminal-patient-input-group full-width">
-            <label>Known Allergies</label>
-            <input
-              type="text"
-              name="allergies"
-              value={currentData.allergies}
-              onChange={handleInputChange}
-              placeholder="List any known allergies to medications or substances"
-              className="terminal-patient-form-input"
-            />
-          </div>
-        </div>
+          return (
+            <div key={index} className="mobile-progress-step-item">
+              <div className={`mobile-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
+                <div className="mobile-step-number">
+                  {isCompleted ? <i className="fa-solid fa-check"></i> : stepNumber}
+                </div>
+                <div className="mobile-step-label">{name}</div>
+              </div>
+              {!isLast && (
+                <div className={`mobile-step-connector ${isCompleted ? 'completed' : ''} ${stepNumber === currentStep ? 'active' : ''}`}></div>
+              )}
+            </div>
+          );
+        })}
       </div>
-    );
-  };
-
-  const renderSummaryStep = () => {
-    const currentData = patientType === 'returning' ? patientData : formData;
-
-    return (
-      <div className="terminal-patient-card terminal-patient-step-transition">
-        <div className="terminal-patient-step-header">
-          <div className="terminal-patient-step-icon"><i className="fa-regular fa-clipboard"></i></div>
-          <h3>Registration Summary</h3>
-          <p>Review all information before completing registration</p>
-        </div>
-
-        {error && <div className="terminal-patient-error">{error}</div>}
-
-        <div className="terminal-patient-summary-sections">
-          <div className="terminal-patient-summary-section">
-            <h4><i className="fa-solid fa-user"></i>Patient Information</h4>
-            <div className="terminal-patient-summary-grid">
-              {patientType === 'returning' ? (
-                <>
-                  <div className="terminal-patient-summary-item">
-                    <label>Patient ID:</label>
-                    <span>{patientData.patient_id}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item">
-                    <label>Full Name:</label>
-                    <span>{patientData.name}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item">
-                    <label>Age:</label>
-                    <span>{patientData.age}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item">
-                    <label>Sex:</label>
-                    <span>{patientData.sex}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item full-width">
-                    <label>Contact:</label>
-                    <span>{patientData.contact_no}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item full-width">
-                    <label>Email:</label>
-                    <span>{patientData.email}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="terminal-patient-summary-item">
-                    <label>Full Name:</label>
-                    <span>{formData.fullName}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item">
-                    <label>Age & Sex:</label>
-                    <span>{formData.age} years old, {formData.sex}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item">
-                    <label>Contact Number:</label>
-                    <span>{formData.contactNumber}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item">
-                    <label>Email:</label>
-                    <span>{formData.email}</span>
-                  </div>
-                  <div className="terminal-patient-summary-item full-width">
-                    <label>Address:</label>
-                    <span>{formData.address}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="terminal-patient-summary-section">
-            <h4><i className="fa-solid fa-stethoscope"></i>Health Information</h4>
-            <div className="terminal-patient-summary-grid">
-              <div className="terminal-patient-summary-item full-width">
-                <label>Symptoms ({currentData.selectedSymptoms.length}):</label>
-                <span>{currentData.selectedSymptoms.join(', ')}</span>
-              </div>
-              <div className="terminal-patient-summary-item">
-                <label>Duration:</label>
-                <span>{currentData.duration}</span>
-              </div>
-              <div className="terminal-patient-summary-item">
-                <label>Severity:</label>
-                <span>{currentData.severity}</span>
-              </div>
-              {currentData.allergies && (
-                <div className="terminal-patient-summary-item full-width">
-                  <label>Allergies:</label>
-                  <span>{currentData.allergies}</span>
-                </div>
-              )}
-              {currentData.medications && (
-                <div className="terminal-patient-summary-item full-width">
-                  <label>Current Medications:</label>
-                  <span>{currentData.medications}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {patientType === 'new' && (
-            <div className="terminal-patient-summary-section">
-              <h4><i className="fa-solid fa-bell"></i>Emergency Contact</h4>
-              <div className="terminal-patient-summary-grid">
-                <div className="terminal-patient-summary-item">
-                  <label>Name:</label>
-                  <span>{formData.emergencyContactName}</span>
-                </div>
-                <div className="terminal-patient-summary-item">
-                  <label>Number:</label>
-                  <span>{formData.emergencyContactNumber}</span>
-                </div>
-                <div className="terminal-patient-summary-item">
-                  <label>Relationship:</label>
-                  <span>{formData.emergencyRelationship}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="terminal-patient-recommended-department">
-            <div className="terminal-patient-recommendation-icon"><i class="fa-solid fa-house-medical"></i></div>
-            <div className="terminal-patient-recommendation-content">
-              <h4>Recommended Department</h4>
-              <p><strong>{generateDepartmentRecommendation()}</strong></p>
-              <small>Based on your selected symptoms</small>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderBackButton = () => {
-    if (patientType === 'returning' && currentStep === 4) {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            localStorage.clear();
-            window.location.href = '/terminal-patient-login';
-          }}
-          className="terminal-patient-nav-btn secondary"
-        >
-          Logout
-        </button>
-      );
-    }
-
-    if ((patientType === 'new' && currentStep === 1) || (patientType === 'returning' && currentStep === 4)) {
-      return (
-        <button
-          type="button"
-          onClick={() => window.location.href = '/terminal-patient-login'}
-          className="terminal-patient-nav-btn home"
-        >
-          <i className="fa-solid fa-less-than"></i>Back to Home
-        </button>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={prevStep}
-        className="terminal-patient-nav-btn secondary"
-      >
-        <i className="fa-solid fa-less-than"></i>Back
-      </button>
-    );
-  };
-
-  const renderNextButton = () => {
-    const maxStep = patientType === 'returning' ? 7 : 6;
-
-    if (currentStep === maxStep) {
-      return (
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="terminal-patient-nav-btn submit"
-        >
-          Submit
-        </button>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={nextStep}
-        className="terminal-patient-nav-btn primary"
-      >
-        Continue<i className="fa-solid fa-greater-than"></i>
-      </button>
-    );
-  };
-
-  const renderCurrentStep = () => {
-    if (patientType === 'returning') {
-      switch (currentStep) {
-        case 4: return renderPatientInfoStep();
-        case 5: return renderSymptomsStep();
-        case 6: return renderDetailsStep();
-        case 7: return renderSummaryStep();
-        default: return renderPatientInfoStep();
-      }
-    }
-
-    switch (currentStep) {
-      case 1: return renderPersonalDetailsStep();
-      case 2: return renderEmergencyContactStep();
-      case 3: return renderReviewStep();
-      case 4: return renderSymptomsStep();
-      case 5: return renderDetailsStep();
-      case 6: return renderSummaryStep();
-      default: return renderPersonalDetailsStep();
-    }
-  };
+    </div>
+  );
 
   return (
-    <div className="terminal-patient-registration-portal">
-      <div className="terminal-patient-header">
-        <div className="terminal-patient-logo">🏥</div>
-        <div className="terminal-patient-title">
+    <div className="mobile-registration-portal">
+      <div className="mobile-reg-header">
+        <div className="mobile-reg-logo">
+          <i className="fa-solid fa-hospital"></i>
+        </div>
+        <div className="mobile-reg-title">
           <h1>CliCare</h1>
           <p>Patient Registration System</p>
         </div>
-        <div className="terminal-patient-hospital-info">
+        <div className="mobile-hospital-info">
           <p><strong>{formatTime(currentTime)}</strong></p>
           <p>{formatDate(currentTime)}</p>
         </div>
       </div>
 
       {renderProgressBar()}
-
-      <div className="terminal-patient-content">
-        {renderCurrentStep()}
+      
+      <div className="mobile-reg-content">
+        {currentStep === 1 && renderPersonalDetailsStep()}
+        {currentStep === 2 && renderEmergencyContactStep()}
+        {currentStep === 3 && renderReviewStep()}
       </div>
 
-      <div className="terminal-patient-nav-container">
-        <div className="terminal-patient-nav-buttons">
-          {renderBackButton()}
-          {renderNextButton()}
-        </div>
+      <div className="mobile-nav-container">
+        {renderNavigationButtons()}
       </div>
 
-      <div className="terminal-patient-help-footer">
-        <div className="terminal-patient-help-section">
+      <div className="mobile-help-footer">
+        <div className="mobile-help-section">
           <h4>Need Help?</h4>
           <p>Press the help button or ask hospital staff for assistance</p>
         </div>
@@ -1578,4 +999,4 @@ const validateAge = (birthday) => {
   );
 };
 
-export default TerminalPatientRegistration;
+export default MobilePatientRegistration;
