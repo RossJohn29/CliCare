@@ -1,1594 +1,1037 @@
-// healthcaredashboard.js - CLICARE Healthcare Dashboard Component (Doctor Only)
+// mobilehealthassessment.js - Aligned with Terminal Design
 import React, { useState, useEffect } from 'react';
-import './healthcaredashboard.css';
+import './mobilehealthassessment.css';
 
-const validateHealthcareToken = async () => {
-  const token = localStorage.getItem('healthcareToken');
-  if (!token) return false;
-  
-  try {
-    const response = await fetch('http://localhost:5000/api/healthcare/profile', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      }
-    });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-};
-
-const HealthcareDashboard = () => {
-  const [currentPage, setCurrentPage] = useState('overview');
-  const [staffInfo, setStaffInfo] = useState({
-    staffId: '',
-    name: '',
-    role: '',
-    department: '',
-    staffType: ''
+const MobileHealthAssessment = () => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [outpatientSymptoms, setOutpatientSymptoms] = useState([]); // Add this state
+  const [symptomsLoading, setSymptomsLoading] = useState(true); // Add this state
+  const [formData, setFormData] = useState({
+    symptoms: [],
+    duration: '',
+    severity: '',
+    previousTreatment: '',
+    allergies: '',
+    medications: '',
+    preferredDate: '',
+    preferredTime: '',
+    urgencyLevel: 'normal'
   });
-  const [dashboardData, setDashboardData] = useState({
-    todayStats: {
-      myPatients: 0,
-      labResults: 0
+  const [loading, setLoading] = useState(false);
+  const [selectedAllergies, setSelectedAllergies] = useState(['']);
+  const [error, setError] = useState('');
+  const [patientInfo, setPatientInfo] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showValidation, setShowValidation] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    // Load patient info from session
+    const patientId = sessionStorage.getItem('patientId') || 'PAT001';
+    const patientName = sessionStorage.getItem('patientName') || 'Patient User';
+    
+    setPatientInfo({
+      patientId: patientId,
+      name: patientName
+    });
+
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const symptomCategories = [
+    {
+      category: 'General',
+      symptoms: ['Fever', 'Headache', 'Fatigue', 'Weight Loss', 'Weight Gain', 'Loss of Appetite']
     },
-    recentActivity: [],
-    patientQueue: [],
-    notifications: []
-  });
-  const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [patientQueue, setPatientQueue] = useState([]);
-  const [queueLoading, setQueueLoading] = useState(false);
-  const [myPatients, setMyPatients] = useState([]);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [patientHistory, setPatientHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [overallPatients, setOverallPatients] = useState([]);
-  const [selectedPatientModal, setSelectedPatientModal] = useState(null);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [overallLoading, setOverallLoading] = useState(false);
-  const [totalPatients, setTotalPatients] = useState(0);
-  const [historyPagination, setHistoryPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    totalVisits: 0,
-    hasNextPage: false
-  });
-  const [labRequests, setLabRequests] = useState([]);
-  const [labResults, setLabResults] = useState([]);
-  const [showLabRequestModal, setShowLabRequestModal] = useState(false);
-  const [selectedPatientForLab, setSelectedPatientForLab] = useState(null);
-  const [labRequestForm, setLabRequestForm] = useState({
-    test_name: '',
-    test_type: '',
-    priority: 'normal',
-    instructions: '',
-    due_date: ''
-  });
-
-  // New state variables for enhanced lab orders
-  const [activeLabTab, setActiveLabTab] = useState('all');
-  const [allLabData, setAllLabData] = useState([]);
-  const [labDataLoading, setLabDataLoading] = useState(false);
-
-  // Helper functions for lab data
-  const getFilteredLabData = () => {
-    switch (activeLabTab) {
-      case 'pending':
-        return allLabData.filter(item => item.status === 'pending');
-      case 'completed':
-        return allLabData.filter(item => item.status === 'completed' && item.hasResult);
-      default:
-        return allLabData;
+    {
+      category: 'Respiratory',
+      symptoms: ['Cough', 'Shortness of Breath', 'Chest Pain', 'Sore Throat', 'Runny Nose', 'Congestion']
+    },
+    {
+      category: 'Cardiovascular',
+      symptoms: ['Chest Discomfort', 'Heart Palpitations', 'Dizziness', 'Swelling in Legs', 'High Blood Pressure']
+    },
+    {
+      category: 'Gastrointestinal',
+      symptoms: ['Nausea', 'Vomiting', 'Diarrhea', 'Constipation', 'Abdominal Pain', 'Heartburn']
+    },
+    {
+      category: 'Musculoskeletal',
+      symptoms: ['Joint Pain', 'Back Pain', 'Muscle Pain', 'Neck Pain', 'Arthritis', 'Injury']
+    },
+    {
+      category: 'Neurological',
+      symptoms: ['Migraine', 'Memory Problems', 'Numbness', 'Tingling', 'Seizures', 'Balance Issues']
+    },
+    {
+      category: 'Skin',
+      symptoms: ['Rash', 'Itching', 'Skin Discoloration', 'Wounds', 'Acne', 'Hair Loss']
+    },
+    {
+      category: 'Mental Health',
+      symptoms: ['Anxiety', 'Depression', 'Stress', 'Sleep Problems', 'Mood Changes']
+    },
+    {
+      category: 'Women\'s Health',
+      symptoms: ['Menstrual Problems', 'Pregnancy Concerns', 'Menopause Symptoms', 'Breast Issues']
+    },
+    {
+      category: 'Eye/ENT',
+      symptoms: ['Vision Problems', 'Hearing Loss', 'Ear Pain', 'Eye Pain', 'Discharge']
+    },
+    {
+      category: 'Routine Care',
+      symptoms: ['Annual Check-up', 'Vaccination', 'Lab Test Follow-up', 'Prescription Refill', 'Health Screening']
     }
-  };
+  ];
 
-  const handleViewFile = (fileUrl, fileName) => {
-    if (fileUrl) {
-      // Ensure proper URL format
-      const fullUrl = fileUrl.startsWith('http') ? fileUrl : `http://localhost:5000${fileUrl}`;
-      window.open(fullUrl, '_blank');
-    } else {
-      alert('File not available');
-    }
-  };
-
-  const fetchAllLabData = async () => {
-  setLabDataLoading(true);
-  try {
-    // Fetch both lab requests and results
-    await Promise.all([
-      fetchLabRequests(),
-      fetchLabResults()
-    ]);
-    
-    // After both are fetched, combine lab requests with their results
-    const combinedData = labRequests.map(request => ({
-      ...request,
-      hasResult: request.labResult !== null,
-      resultData: request.labResult || null
-    }));
-    
-    setAllLabData(combinedData);
-  } catch (error) {
-    console.error('Failed to fetch lab data:', error);
-  } finally {
-    setLabDataLoading(false);
-  }
-};
-
-  useEffect(() => {
-  const fetchOverallPatients = async () => {
-    try {
-      setOverallLoading(true);
-      const token = localStorage.getItem('healthcareToken');
-      
-      const response = await fetch('http://localhost:5000/api/healthcare/all-patients', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setOverallPatients(data.patients || []);
-        setTotalPatients(data.totalCount || 0);
-      }
-    } catch (error) {
-      console.error('Failed to fetch overall patients:', error);
-    } finally {
-      setOverallLoading(false);
-    }
-  };
-
-  const initializeDashboard = async () => {
-    try {
-      const token = localStorage.getItem('healthcareToken'); 
-      const staffInfo = localStorage.getItem('staffInfo');   
-      
-      if (!token || !staffInfo) {
-        window.location.replace('/healthcare-login');
-        return;
-      }
-
-      const isValid = await validateHealthcareToken();
-      if (!isValid) {
-        localStorage.clear();
-        window.location.replace('/healthcare-login');
-        return;
-      }
-
-      const parsedStaffInfo = JSON.parse(staffInfo);
-      
-      if (parsedStaffInfo.role !== 'Doctor') {
-        alert('Access denied. This system is for doctors only.');
-        window.location.replace('/healthcare-login');
-        return;
-      }
-      
-      setStaffInfo({
-        staffId: parsedStaffInfo.staff_id,
-        name: parsedStaffInfo.name,
-        role: 'Attending Physician',
-        department: parsedStaffInfo.specialization || 'General Medicine',
-        staffType: 'doctor'
-      });
-
-      // Fetch initial data
-      await fetchPatientQueue();
-      await fetchMyPatients();
-      await fetchOverallPatients();
-      
-      setLoading(false);
-
-    } catch (error) {
-      console.error('Error initializing dashboard:', error);
-      localStorage.clear();
-      window.location.replace('/healthcare-login');
-    }
-  };
-
-  initializeDashboard();
-  
-  // Set up auto-refresh every 60 seconds
-  const interval = setInterval(async () => {
-    try {
-      await fetchPatientQueue();
-      if (currentPage === 'patients') {
-        await fetchMyPatients();
-      }
-    } catch (error) {
-      console.error('Auto-refresh error:', error);
-    }
-  }, 60000);
-  
-  return () => clearInterval(interval);
-}, []); // Empty dependency array
-
+  // Fetch symptoms from database
 useEffect(() => {
-  const fetchLabDataWhenNeeded = async () => {
-    if (currentPage === 'lab-orders') {
-      try {
-        await fetchLabRequests();
-        await fetchLabResults();
-        
-        // Combine data after both requests complete
-        const combinedData = labRequests.map(request => ({
-          ...request,
-          hasResult: request.labResult !== null,
-          resultData: request.labResult || null
-        }));
-        
-        setAllLabData(combinedData);
-      } catch (error) {
-        console.error('Error fetching lab data:', error);
-      }
-    }
-  };
-
-  fetchLabDataWhenNeeded();
-}, [currentPage]); // Remove labRequests and labResults from dependency array
-
-  useEffect(() => {
-    if (currentPage === 'patients' && selectedPatient) {
-      const interval = setInterval(() => {
-        fetchPatientHistory(selectedPatient.patient_id, historyPagination.currentPage);
-      }, 30000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [currentPage, selectedPatient, historyPagination.currentPage]);
-
-  const fetchLabRequests = async () => {
+  const fetchSymptoms = async () => {
     try {
-      const token = localStorage.getItem('healthcareToken');
+      setSymptomsLoading(true);
+      console.log('Mobile: Fetching symptoms from API...');
       
-      const response = await fetch('http://localhost:5000/api/healthcare/lab-requests', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
+      const response = await fetch('http://localhost:5000/api/symptoms');
+      console.log('Mobile API Response status:', response.status);
+      
       if (response.ok) {
-        const data = await response.json();
-        setLabRequests(data.labRequests || []);
+        const result = await response.json();
+        console.log('Mobile API Response data:', result);
+        
+        if (result.success && result.symptoms && result.symptoms.length > 0) {
+          setOutpatientSymptoms(result.symptoms);
+          console.log('✅ Mobile symptoms loaded successfully:', result.symptoms.length, 'categories');
+        } else {
+          console.error('❌ No symptoms data in mobile API response');
+          // Fallback to comprehensive default symptoms matching your database
+          setOutpatientSymptoms([
+            {
+              category: 'General Symptoms',
+              symptoms: ['Fever', 'Headache', 'Fatigue', 'Body Aches', 'Dizziness', 'Nausea', 'Vomiting', 'Loss of Appetite']
+            },
+            {
+              category: 'Respiratory',
+              symptoms: ['Cough', 'Shortness of Breath', 'Chest Tightness', 'Sore Throat', 'Runny Nose', 'Sneezing']
+            },
+            {
+              category: 'Cardiovascular',
+              symptoms: ['Chest Pain', 'Heart Palpitations', 'High Blood Pressure', 'Irregular Heartbeat']
+            },
+            {
+              category: 'Gastrointestinal',
+              symptoms: ['Stomach Ache', 'Diarrhea', 'Constipation', 'Heartburn', 'Bloating']
+            },
+            {
+              category: 'Musculoskeletal',
+              symptoms: ['Back Pain', 'Joint Pain', 'Muscle Cramps', 'Neck Pain']
+            },
+            {
+              category: 'Neurological',
+              symptoms: ['Migraine', 'Memory Problems', 'Numbness', 'Tingling', 'Balance Issues']
+            },
+            {
+              category: 'Skin',
+              symptoms: ['Rash', 'Itching', 'Skin Discoloration', 'Acne']
+            },
+            {
+              category: 'Mental Health',
+              symptoms: ['Anxiety', 'Depression', 'Stress', 'Sleep Problems', 'Mood Changes']
+            },
+            {
+              category: 'Eye/ENT',
+              symptoms: ['Vision Problems', 'Hearing Loss', 'Ear Pain', 'Eye Pain']
+            },
+            {
+              category: 'Women\'s Health',
+              symptoms: ['Menstrual Problems', 'Pregnancy Concerns', 'Menopause Symptoms']
+            },
+            {
+              category: 'Routine Care',
+              symptoms: ['Annual Check-up', 'Health Screening', 'Vaccination', 'Follow-up Visit', 'Lab Test Follow-up', 'Prescription Refill']
+            }
+          ]);
+          setError('Using default symptoms list. Please check your connection.');
+        }
+      } else {
+        console.error('❌ Mobile API request failed:', response.status);
+        throw new Error(`API request failed with status ${response.status}`);
       }
     } catch (error) {
-      console.error('Failed to fetch lab requests:', error);
-    }
-  };
-
-  const fetchLabResults = async () => {
-    try {
-      const token = localStorage.getItem('healthcareToken');
-      
-      const response = await fetch('http://localhost:5000/api/healthcare/lab-results', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      console.error('❌ Mobile error fetching symptoms:', error);
+      setError('Failed to load symptoms from server. Using offline list.');
+      // Comprehensive fallback matching your database structure
+      setOutpatientSymptoms([
+        {
+          category: 'General Symptoms',
+          symptoms: ['Fever', 'Headache', 'Fatigue', 'Body Aches', 'Dizziness', 'Nausea', 'Vomiting', 'Loss of Appetite']
+        },
+        {
+          category: 'Respiratory',
+          symptoms: ['Cough', 'Shortness of Breath', 'Chest Tightness', 'Sore Throat', 'Runny Nose', 'Sneezing']
+        },
+        {
+          category: 'Cardiovascular',
+          symptoms: ['Chest Pain', 'Heart Palpitations', 'High Blood Pressure', 'Irregular Heartbeat']
+        },
+        {
+          category: 'Gastrointestinal',
+          symptoms: ['Stomach Ache', 'Diarrhea', 'Constipation', 'Heartburn', 'Bloating']
+        },
+        {
+          category: 'Musculoskeletal',
+          symptoms: ['Back Pain', 'Joint Pain', 'Muscle Cramps', 'Neck Pain']
+        },
+        {
+          category: 'Neurological',
+          symptoms: ['Migraine', 'Memory Problems', 'Numbness', 'Tingling', 'Balance Issues']
+        },
+        {
+          category: 'Skin',
+          symptoms: ['Rash', 'Itching', 'Skin Discoloration', 'Acne']
+        },
+        {
+          category: 'Mental Health',
+          symptoms: ['Anxiety', 'Depression', 'Stress', 'Sleep Problems', 'Mood Changes']
+        },
+        {
+          category: 'Eye/ENT',
+          symptoms: ['Vision Problems', 'Hearing Loss', 'Ear Pain', 'Eye Pain']
+        },
+        {
+          category: 'Women\'s Health',
+          symptoms: ['Menstrual Problems', 'Pregnancy Concerns', 'Menopause Symptoms']
+        },
+        {
+          category: 'Routine Care',
+          symptoms: ['Annual Check-up', 'Health Screening', 'Vaccination', 'Follow-up Visit', 'Lab Test Follow-up', 'Prescription Refill']
         }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setLabResults(data.labResults || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch lab results:', error);
+      ]);
+    } finally {
+      setSymptomsLoading(false);
     }
   };
 
-  // Fix the createLabRequest function (around line 180)
-const createLabRequest = async () => {
-  try {
-    // Validate required fields
-    if (!selectedPatientForLab) {
-      alert('Please select a patient');
-      return;
-    }
-    
-    if (!labRequestForm.test_name.trim()) {
-      alert('Please enter test name');
-      return;
-    }
-    
-    if (!labRequestForm.test_type) {
-      alert('Please select test type');
-      return;
-    }
-    
-    if (!labRequestForm.due_date) {
-      alert('Please select due date');
-      return;
-    }
+  fetchSymptoms();
+}, []);
 
-    const token = localStorage.getItem('healthcareToken');
+  const allergyCategories = {
+    medications: {
+      title: "Medication Allergies",
+      items: [
+        "Penicillin (amoxicillin, augmentin)",
+        "Cephalosporins (cefalexin, ceftriaxone)",
+        "Sulfa drugs (sulfamethoxazole)",
+        "Aspirin (ASA)",
+        "NSAIDs (ibuprofen, naproxen)",
+        "Codeine",
+        "Morphine",
+        "Local anesthetics (lidocaine)",
+        "Anticonvulsants (phenytoin, carbamazepine)",
+        "Chemotherapy agents (cisplatin)",
+        "Insulin (non-human)",
+        "Vaccines (egg-based flu vaccines)"
+      ]
+    },
+    foods: {
+      title: "Food Allergies",
+      items: [
+        "Peanuts",
+        "Tree nuts (almonds, walnuts, cashews)",
+        "Shellfish (shrimp, crab, lobster)",
+        "Fish (salmon, tuna, cod)",
+        "Eggs",
+        "Milk / Dairy",
+        "Wheat / Gluten",
+        "Soy",
+        "Sesame",
+        "Corn",
+        "Strawberries",
+        "Tomatoes",
+        "Food dyes / additives (Red Dye 40, MSG)"
+      ]
+    }
+  };
+
+  const handleSymptomToggle = (symptom) => {
+    const isSelected = formData.symptoms.includes(symptom);
+    const updatedSymptoms = isSelected
+      ? formData.symptoms.filter(s => s !== symptom)
+      : [...formData.symptoms, symptom];
     
-    const requestData = {
-      patient_id: selectedPatientForLab.patient_id,
-      test_name: labRequestForm.test_name.trim(),
-      test_type: labRequestForm.test_type,
-      priority: labRequestForm.priority || 'normal',
-      instructions: labRequestForm.instructions.trim(),
-      due_date: labRequestForm.due_date
-    };
-
-    console.log('Creating lab request:', requestData);
-
-    const response = await fetch('http://localhost:5000/api/healthcare/lab-requests', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData)
+    setFormData({
+      ...formData,
+      symptoms: updatedSymptoms
     });
+    setError('');
 
-    const result = await response.json();
+    if (showValidation) {
+      setShowValidation(false);
+      setFieldErrors({});
+    }
+  };
 
-    if (response.ok) {
-      alert('Lab request created successfully!');
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+
+    if (showValidation) {
+      setShowValidation(false);
+      setFieldErrors({});
+    }
+  };
+
+  const handleAllergySelect = (allergy, index) => {
+    if (allergy) {
+      const newAllergies = [...selectedAllergies];
+      newAllergies[index] = allergy;
+      setSelectedAllergies(newAllergies);
       
-      // Reset form and close modal
-      setShowLabRequestModal(false);
-      setSelectedPatientForLab(null);
-      setLabRequestForm({
-        test_name: '',
-        test_type: '',
-        priority: 'normal',
-        instructions: '',
-        due_date: ''
+      setFormData({
+        ...formData,
+        allergies: newAllergies.filter(a => a).join(', ')
       });
-      
-      // Refresh data properly
-      await fetchLabRequests();
-      await fetchLabResults();
-      
-      // Update combined data
-      const combinedData = labRequests.map(request => ({
-        ...request,
-        hasResult: request.labResult !== null,
-        resultData: request.labResult || null
-      }));
-      
-      setAllLabData(combinedData);
-      
-    } else {
-      throw new Error(result.error || 'Failed to create lab request');
+    }
+  };
+
+  const addAllergyDropdown = () => {
+    setSelectedAllergies([...selectedAllergies, '']);
+  };
+
+  const removeAllergyDropdown = (index) => {
+    const newAllergies = selectedAllergies.filter((_, i) => i !== index);
+    setSelectedAllergies(newAllergies);
+    
+    setFormData({
+      ...formData,
+      allergies: newAllergies.filter(a => a).join(', ')
+    });
+  };
+
+  const validateStep = (step) => {
+    switch (step) {
+      case 1:
+        return formData.symptoms.length > 0;
+      case 2:
+        return formData.duration && formData.severity;
+      case 3:
+        return formData.preferredDate && formData.preferredTime;
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    const stepErrors = {};
+
+    if (currentStep === 1) {
+      if (formData.symptoms.length === 0) {
+        stepErrors.symptoms = 'Please select at least one symptom';
+      }
     }
 
-  } catch (error) {
-    console.error('Failed to create lab request:', error);
-    alert('Failed to create lab request: ' + error.message);
+    if (currentStep === 2) {
+      if (!formData.duration) stepErrors.duration = 'Please select duration';
+      if (!formData.severity) stepErrors.severity = 'Please select severity level';
+    }
+
+    if (currentStep === 3) {
+      if (!formData.preferredDate) stepErrors.preferredDate = 'Please select preferred date';
+      if (!formData.preferredTime) stepErrors.preferredTime = 'Please select preferred time';
+    }
+
+    setFieldErrors(stepErrors);
+    setShowValidation(true);
+
+    if (Object.keys(stepErrors).length === 0) {
+      setCurrentStep(currentStep + 1);
+      setShowValidation(false);
+      setError('');
+    } else {
+      if (currentStep === 1) {
+        setError('Please select at least one symptom');
+      } else if (currentStep === 2) {
+        setError('Please fill in all required fields');
+      } else if (currentStep === 3) {
+        setError('Please select your preferred appointment date and time');
+      }
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+    setError('');
+  };
+
+  const generateDepartmentRecommendation = () => {
+  const departmentMapping = {
+    // Emergency/High Priority - Cardiology
+    'Chest Pain': 'Cardiology',
+    'Chest Discomfort': 'Cardiology',
+    'Heart Palpitations': 'Cardiology',
+    'High Blood Pressure': 'Cardiology',
+    'Shortness of Breath': 'Cardiology',
+    'Irregular Heartbeat': 'Cardiology',
+    
+    // Neurological - Internal Medicine
+    'Migraine': 'Internal Medicine',
+    'Memory Problems': 'Internal Medicine',
+    'Numbness': 'Internal Medicine',
+    'Tingling': 'Internal Medicine',
+    'Balance Issues': 'Internal Medicine',
+    'Seizures': 'Emergency',
+    
+    // Gastrointestinal - Internal Medicine
+    'Stomach Ache': 'Internal Medicine',
+    'Diarrhea': 'Internal Medicine',
+    'Constipation': 'Internal Medicine',
+    'Heartburn': 'Internal Medicine',
+    'Bloating': 'Internal Medicine',
+    
+    // General/Internal Medicine
+    'Fever': 'Internal Medicine',
+    'Headache': 'Internal Medicine',
+    'Fatigue': 'Internal Medicine',
+    'Body Aches': 'Internal Medicine',
+    'Dizziness': 'Internal Medicine',
+    'Nausea': 'Internal Medicine',
+    'Vomiting': 'Internal Medicine',
+    'Loss of Appetite': 'Internal Medicine',
+    'Cough': 'Internal Medicine',
+    'Sore Throat': 'Internal Medicine',
+    'Runny Nose': 'Internal Medicine',
+    'Sneezing': 'Internal Medicine',
+    'Back Pain': 'Internal Medicine',
+    'Joint Pain': 'Internal Medicine',
+    'Muscle Cramps': 'Internal Medicine',
+    'Neck Pain': 'Internal Medicine',
+    'Rash': 'Internal Medicine',
+    'Itching': 'Internal Medicine',
+    'Skin Discoloration': 'Internal Medicine',
+    'Acne': 'Internal Medicine',
+    'Hair Loss': 'Internal Medicine',
+    'Anxiety': 'Internal Medicine',
+    'Depression': 'Internal Medicine',
+    'Stress': 'Internal Medicine',
+    'Sleep Problems': 'Internal Medicine',
+    'Mood Changes': 'Internal Medicine',
+    'Vision Problems': 'Internal Medicine',
+    'Hearing Loss': 'Internal Medicine',
+    'Ear Pain': 'Internal Medicine',
+    'Eye Pain': 'Internal Medicine',
+    'Discharge': 'Internal Medicine',
+    'Wounds': 'Emergency',
+    
+    // Women's Health - Internal Medicine
+    'Menstrual Problems': 'Internal Medicine',
+    'Pregnancy Concerns': 'Internal Medicine',
+    'Menopause Symptoms': 'Internal Medicine',
+    'Breast Issues': 'Internal Medicine',
+    
+    // Routine Care - Internal Medicine
+    'Annual Check-up': 'Internal Medicine',
+    'Health Screening': 'Internal Medicine',
+    'Vaccination': 'Internal Medicine',
+    'Follow-up Visit': 'Internal Medicine',
+    'Lab Test Follow-up': 'Internal Medicine',
+    'Prescription Refill': 'Internal Medicine'
+  };
+
+  // Find the most critical symptom first
+  for (const symptom of formData.symptoms) {
+    if (departmentMapping[symptom]) {
+      return departmentMapping[symptom];
+    }
   }
+  
+  return 'Internal Medicine'; // Default to Internal Medicine
 };
 
-  const fetchPatientModal = async (patientId) => {
-    try {
-      setModalLoading(true);
-      const token = localStorage.getItem('healthcareToken');
-      
-      const response = await fetch(`http://localhost:5000/api/healthcare/patient-details/${patientId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError('');
 
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedPatientModal(data.patient);
+    try {
+      // Get registration info from session
+      const tempRegId = sessionStorage.getItem('tempRegId');
+      const tempPatientId = sessionStorage.getItem('tempPatientId');
+      const patientEmail = sessionStorage.getItem('patientEmail');
+
+      if (!tempRegId || !tempPatientId) {
+        throw new Error('Registration information not found. Please start over.');
       }
-    } catch (error) {
-      console.error('Failed to fetch patient details:', error);
-    } finally {
-      setModalLoading(false);
-    }
-  };
 
-  const fetchMyPatients = async () => {
-    try {
-      const token = localStorage.getItem('healthcareToken');
-      const today = new Date().toISOString().split('T')[0];
-      
-      const response = await fetch(`http://localhost:5000/api/healthcare/my-patients-queue?date=${today}`, {
+      // Prepare health assessment data according to database schema
+      const healthAssessmentData = {
+        temp_id: parseInt(tempRegId),
+        symptoms: formData.symptoms.join(', '),
+        duration: formData.duration,
+        severity: formData.severity,
+        previous_treatment: formData.previousTreatment || null,
+        allergies: formData.allergies || null,
+        medications: formData.medications || null,
+        preferred_date: formData.preferredDate,
+        preferred_time_slot: formData.preferredTime,
+        scheduled_date: formData.preferredDate,
+        status: 'completed'
+      };
+
+      console.log('Submitting health assessment data:', healthAssessmentData);
+
+      // Update temp registration with health assessment data
+      const response = await fetch(`http://localhost:5000/api/temp-registration/${tempRegId}/health-assessment`, {
+        method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setMyPatients(data.patients || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch my patients:', error);
-    }
-  };
-
-  const fetchPatientHistory = async (patientId, page = 1) => {
-    try {
-      setHistoryLoading(true);
-      const token = localStorage.getItem('healthcareToken');
-      
-      const response = await fetch(`http://localhost:5000/api/healthcare/patient-history/${patientId}?page=${page}&limit=10`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedPatient(data.patient);
-        setPatientHistory(data.visitHistory || []);
-        setHistoryPagination(data.pagination);
-      } else {
-        setPatientHistory([]);
-        setSelectedPatient(null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch patient history:', error);
-      setPatientHistory([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const fetchPatientQueue = async () => {
-    try {
-      setQueueLoading(true);
-      const token = localStorage.getItem('healthcareToken');
-      
-      const response = await fetch('http://localhost:5000/api/healthcare/patient-queue', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPatientQueue(data.queue || []);
-        
-        // Update dashboard stats
-        setDashboardData(prev => ({
-          ...prev,
-          todayStats: data.todayStats
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to fetch patient queue:', error);
-    } finally {
-      setQueueLoading(false);
-    }
-  };
-
-  const updateQueueStatus = async (queueId, newStatus) => {
-    try {
-      const token = localStorage.getItem('healthcareToken');
-      
-      const response = await fetch(`http://localhost:5000/api/healthcare/queue/${queueId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus })
+        credentials: 'include',
+        body: JSON.stringify(healthAssessmentData)
       });
 
-      if (response.ok) {
-        // Refresh the queue
-        fetchPatientQueue();
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Health assessment submission failed');
       }
-    } catch (error) {
-      console.error('Failed to update queue status:', error);
-    }
-  };
 
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      localStorage.clear();
-      window.location.replace('/healthcare-login');
-    }
-  };
+      console.log('Health assessment submitted successfully:', result);
 
-  const getMenuItems = () => {
-    return [
-      { id: 'overview', icon: '📊', label: 'Dashboard Overview', description: 'Daily statistics and activities' },
-      { id: 'patients', icon: '👥', label: 'My Patients', description: 'Today\'s consultations only' },
-      { id: 'overall-patients', icon: '👤', label: 'Overall Patient', description: 'All registered patients' },
-      { id: 'lab-orders', icon: '🧪', label: 'Lab Orders', description: 'Laboratory test requests' }
-    ];
-  };
+      // Generate QR code data
+      const recommendedDepartment = generateDepartmentRecommendation();
+      const qrData = {
+        type: 'mobile_registration',
+        tempRegId: tempRegId,
+        tempPatientId: tempPatientId,
+        patientName: patientInfo.name,
+        department: recommendedDepartment,
+        scheduledDate: formData.preferredDate,
+        preferredTime: formData.preferredTime,
+        symptoms: formData.symptoms.join(', '),
+        severity: formData.severity,
+        timestamp: new Date().toISOString()
+      };
 
-  const renderLabOrdersPage = () => (
-    <div className="healthcare-page-content">
-      <div className="healthcare-page-header">
-        <h2>Laboratory Management</h2>
-        <p>Manage laboratory test requests and review submitted results</p>
-      </div>
+      // Generate and send QR code via email
+      const qrResponse = await fetch('http://localhost:5000/api/generate-qr-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          qrData: qrData,
+          patientEmail: patientEmail,
+          patientName: patientInfo.name
+        })
+      });
 
-      <div className="healthcare-lab-tabs">
-        <div className="healthcare-tab-buttons">
-          <button 
-            className={`healthcare-tab-btn ${activeLabTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveLabTab('all')}
-          >
-            All Lab Orders ({allLabData.length})
-          </button>
-          <button 
-            className={`healthcare-tab-btn ${activeLabTab === 'pending' ? 'active' : ''}`}
-            onClick={() => setActiveLabTab('pending')}
-          >
-            Pending Upload ({allLabData.filter(item => item.status === 'pending').length})
-          </button>
-          <button 
-            className={`healthcare-tab-btn ${activeLabTab === 'completed' ? 'active' : ''}`}
-            onClick={() => setActiveLabTab('completed')}
-          >
-            Completed ({allLabData.filter(item => item.status === 'completed' && item.hasResult).length})
-          </button>
-        </div>
+      const qrResult = await qrResponse.json();
 
-      <div className="healthcare-lab-actions">
-        <button 
-  onClick={async () => {
-    try {
-      setLabDataLoading(true);
-      await fetchLabRequests();
-      await fetchLabResults();
+      if (!qrResponse.ok) {
+        console.warn('QR email sending failed:', qrResult.error);
+        // Continue even if email fails
+      } else {
+        console.log('QR code email sent successfully');
+      }
+
+      // Store QR data in session for confirmation page
+      sessionStorage.setItem('qrCodeData', JSON.stringify(qrData));
+
+      // Show success message
+      alert(`Health assessment completed!\n\nAppointment Request Submitted:\nRecommended Department: ${recommendedDepartment}\nDate: ${formData.preferredDate}\nTime: ${formData.preferredTime}\n\nA QR code has been sent to your email. You can also view it on the next page.`);
       
-      // Update combined data after refresh
-      const combinedData = labRequests.map(request => ({
-        ...request,
-        hasResult: request.labResult !== null,
-        resultData: request.labResult || null
-      }));
-      
-      setAllLabData(combinedData);
-    } catch (error) {
-      console.error('Refresh failed:', error);
+      // Navigate to QR confirmation page
+      window.location.href = '/mobile-qr-confirmation';
+
+    } catch (err) {
+      console.error('Health assessment submission error:', err);
+      setError(err.message || 'Submission failed. Please check your internet connection and try again.');
     } finally {
-      setLabDataLoading(false);
+      setLoading(false);
     }
-  }}
-  className="healthcare-action-btn"
-  disabled={labDataLoading}
->
-  {labDataLoading ? '🔄 Loading...' : '🔄 Refresh'}
-</button>
-        <button 
-          onClick={() => {
-            // Check if we have any patients available from overall patients or queue
-            const availablePatients = [...(myPatients || []), ...(overallPatients || [])];
-            
-            if (availablePatients.length === 0) {
-              alert('No patients available. Please ensure there are patients in the system or refresh the page.');
-              return;
-            }
-            
-            // Set the first available patient as default
-            setSelectedPatientForLab(availablePatients[0]);
-            setShowLabRequestModal(true);
-          }}
-          className="healthcare-action-btn primary"
-        >
-          + New Lab Request
-        </button>
+  };
+
+  const renderSymptomStep = () => (
+  <div className="assessment-card assessment-step-transition">
+    <div className="assessment-step-header">
+      <div className="assessment-step-icon">
+        <i className="fa-solid fa-stethoscope"></i>
       </div>
+      <h3>Select Your Symptoms</h3>
+      <p>Choose all symptoms that apply to your current condition</p>
+    </div>
+
+    {formData.symptoms.length > 0 && (
+      <div className="selected-symptoms">
+        <h4>Selected Symptoms ({formData.symptoms.length})</h4>
+        <div className="selected-list">
+          {formData.symptoms.map((symptom, index) => (
+            <button
+              key={index}
+              onClick={() => handleSymptomToggle(symptom)}
+              className="selected-symptom"
+            >
+              <span>{symptom}</span>
+              <span className="remove-icon">×</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {symptomsLoading ? (
+      <div className="assessment-loading">
+        <span className="loading-spinner"></span>
+        Loading symptoms...
+      </div>
+    ) : outpatientSymptoms.length === 0 ? (
+      <div className="assessment-error">
+        No symptoms available. Please refresh the page or contact support.
+      </div>
+    ) : (
+      <div className="symptom-categories">
+        {outpatientSymptoms.map((category, categoryIndex) => (
+          <div key={categoryIndex} className="symptom-category">
+            <h4 className="category-title">{category.category}</h4>
+            <div className="symptom-grid">
+              {category.symptoms.map((symptom, symptomIndex) => (
+                <button
+                  key={`${category.category}-${symptom}-${symptomIndex}`}
+                  onClick={() => handleSymptomToggle(symptom)}
+                  className={`symptom-btn ${
+                    formData.symptoms.includes(symptom) ? 'selected' : ''
+                  }`}
+                >
+                  <span className="symptom-text">{symptom}</span>
+                  {formData.symptoms.includes(symptom) && (
+                    <span className="check-icon">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {showValidation && fieldErrors.symptoms && (
+      <div className="assessment-error">{fieldErrors.symptoms}</div>
+    )}
+  </div>
+);
+
+  const renderDetailsStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-solid fa-clipboard-list"></i>
+        </div>
+        <h3>Symptom Details</h3>
+        <p>Provide more information about your condition</p>
       </div>
 
-      {labDataLoading ? (
-        <div className="healthcare-loading-container">
-          <div className="healthcare-loading-spinner"></div>
-          <p>Loading laboratory data...</p>
+      <div className="form-grid">
+        <div className="input-group">
+          <label>Duration *</label>
+          <select
+            name="duration"
+            value={formData.duration}
+            onChange={handleInputChange}
+            className={`form-input ${fieldErrors.duration ? 'invalid' : ''} ${formData.duration ? 'has-value' : 'empty'}`}
+            required
+          >
+            <option value="" disabled hidden>How long have you had these symptoms?</option>
+            <option value="less-than-day">Less than a day</option>
+            <option value="1-3-days">1-3 days</option>
+            <option value="4-7-days">4-7 days</option>
+            <option value="1-2-weeks">1-2 weeks</option>
+            <option value="2-4-weeks">2-4 weeks</option>
+            <option value="1-3-months">1-3 months</option>
+            <option value="more-than-3-months">More than 3 months</option>
+          </select>
+          {showValidation && fieldErrors.duration && (
+            <small className="error-text">{fieldErrors.duration}</small>
+          )}
         </div>
-      ) : (
-        <div className="healthcare-lab-results-section">
-          {getFilteredLabData().length === 0 ? (
-            <div className="healthcare-no-data">
-              <div className="healthcare-no-data-icon">🧪</div>
-              <p>No {activeLabTab === 'all' ? 'lab orders' : activeLabTab === 'pending' ? 'pending requests' : 'completed results'} found</p>
-              {activeLabTab === 'all' && (
-                <button 
-                  onClick={() => setShowLabRequestModal(true)}
-                  className="healthcare-action-btn"
+
+        <div className="input-group">
+          <label>Severity Level *</label>
+          <select
+            name="severity"
+            value={formData.severity}
+            onChange={handleInputChange}
+            className={`form-input ${fieldErrors.severity ? 'invalid' : ''} ${formData.severity ? 'has-value' : 'empty'}`}
+            required
+          >
+            <option value="" disabled hidden>Rate your symptom severity</option>
+            <option value="mild">Mild - Doesn't interfere with daily activities</option>
+            <option value="moderate">Moderate - Some interference with activities</option>
+            <option value="severe">Severe - Significant interference</option>
+            <option value="very-severe">Very Severe - Unable to function normally</option>
+          </select>
+          {showValidation && fieldErrors.severity && (
+            <small className="error-text">{fieldErrors.severity}</small>
+          )}
+        </div>
+
+        <div className="input-group">
+          <label>Previous Treatment</label>
+          <input
+            type='text'
+            name="previousTreatment"
+            value={formData.previousTreatment}
+            onChange={handleInputChange}
+            placeholder="Any medications, treatments, or remedies you've tried"
+            className="form-input"
+          />
+        </div>
+
+        <div className="input-group">
+          <label>Known Allergies</label>
+          
+          {selectedAllergies.map((selectedAllergy, index) => (
+            <div key={index} className="allergy-dropdown-container">
+              <select
+                value={selectedAllergy}
+                onChange={(e) => handleAllergySelect(e.target.value, index)}
+                className="form-input"
+              >
+                <option value="">Select an allergy</option>
+                {Object.entries(allergyCategories).map(([categoryKey, category]) => (
+                  <optgroup key={categoryKey} label={category.title}>
+                    {category.items.map((item, itemIndex) => (
+                      <option key={itemIndex} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              
+              {selectedAllergies.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeAllergyDropdown(index)}
+                  className="remove-allergy-btn"
                 >
-                  Create First Lab Request
+                  ✕
                 </button>
               )}
             </div>
-          ) : (
-            <div className="healthcare-lab-results-grid">
-              {getFilteredLabData().map((item) => (
-                <div key={item.request_id} className={`healthcare-lab-result-card ${item.status}`}>
-                  <div className="healthcare-lab-result-header">
-                    <div className="healthcare-lab-info">
-                      <h4>{item.test_name}</h4>
-                      <div className="healthcare-lab-meta">
-                        <span className="healthcare-request-id">#{item.request_id}</span>
-                        <span className={`healthcare-lab-status ${item.status}`}>
-                          {item.status === 'pending' ? 'Awaiting Upload' : 
-                           item.status === 'completed' ? 'Result Available' : 
-                           item.status}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="healthcare-lab-actions">
-                      {item.hasResult && item.resultData && (
-                        <button 
-                          onClick={() => handleViewFile(item.resultData.file_url, item.resultData.file_name)}
-                          className="healthcare-view-result-btn"
-                          title="View uploaded result"
-                        >
-                          View File
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="healthcare-lab-result-content">
-                    <div className="healthcare-patient-info">
-                      <div className="healthcare-patient-details">
-                        <strong>{item.patient?.name}</strong>
-                        <span>ID: {item.patient?.patient_id}</span>
-                        <span>{item.patient?.age}y, {item.patient?.sex}</span>
-                      </div>
-                      <div className="healthcare-contact-info">
-                        <span>{item.patient?.contact_no}</span>
-                      </div>
-                    </div>
+          ))}
+          
+          <button
+            type="button"
+            onClick={addAllergyDropdown}
+            className="add-allergy-btn"
+          >
+            + Add Known Allergy
+          </button>
+        </div>
 
-                    <div className="healthcare-lab-details">
-                      <div className="healthcare-lab-detail-row">
-                        <span>Test Type:</span>
-                        <span>{item.test_type}</span>
-                      </div>
-                      <div className="healthcare-lab-detail-row">
-                        <span>Priority:</span>
-                        <span className={`priority ${item.priority}`}>{item.priority}</span>
-                      </div>
-                      <div className="healthcare-lab-detail-row">
-                        <span>Requested:</span>
-                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <div className="healthcare-lab-detail-row">
-                        <span>Due Date:</span>
-                        <span>{new Date(item.due_date).toLocaleDateString()}</span>
-                      </div>
-                      {item.instructions && (
-                        <div className="healthcare-lab-instructions">
-                          <strong>Instructions:</strong> {item.instructions}
-                        </div>
-                      )}
-                    </div>
+        <div className="input-group">
+          <label>Current Medications</label>
+          <input
+            type='text'
+            name="medications"
+            value={formData.medications}
+            onChange={handleInputChange}
+            placeholder="List any medications you're currently taking"
+            className="form-input"
+          />
+        </div>
+      </div>
+    </div>
+  );
 
-                    {item.hasResult && item.resultData && (
-                      <div className="healthcare-result-info">
-                        <div className="healthcare-result-header">
-                          <strong>Result Submitted</strong>
-                          <span className="healthcare-upload-date">
-                            {new Date(item.resultData.upload_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="healthcare-result-file">
-                          <span className="healthcare-file-icon">📄</span>
-                          <span className="healthcare-file-name">{item.resultData.file_name}</span>
-                          <button 
-                            onClick={() => handleViewFile(item.resultData.file_url, item.resultData.file_name)}
-                            className="healthcare-file-view-btn"
-                          >
-                            Open
-                          </button>
-                        </div>
-                      </div>
-                    )}
+  const renderSchedulingStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-regular fa-calendar"></i>
+        </div>
+        <h3>Appointment Scheduling</h3>
+        <p>Choose your preferred appointment date and time</p>
+      </div>
 
-                    {item.status === 'pending' && (
-                      <div className="healthcare-pending-notice">
-                        <div className="healthcare-pending-icon">⏳</div>
-                        <div className="healthcare-pending-text">
-                          <strong>Waiting for patient to upload result</strong>
-                          <small>Patient will receive notification to upload their lab result</small>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+      <div className="form-grid">
+        <div className="input-group">
+          <label>Preferred Date *</label>
+          <input
+            type="date"
+            name="preferredDate"
+            value={formData.preferredDate}
+            onChange={handleInputChange}
+            min={new Date().toISOString().split('T')[0]}
+            className={`form-input ${fieldErrors.preferredDate ? 'invalid' : ''} ${formData.preferredDate ? 'has-value' : 'empty'}`}
+            required
+          />
+          {showValidation && fieldErrors.preferredDate && (
+            <small className="error-text">{fieldErrors.preferredDate}</small>
           )}
         </div>
-      )}
 
-      {/* Lab Request Modal */}
-      {/* Lab Request Modal - FIXED VERSION */}
-{showLabRequestModal && (
-  <div className="healthcare-modal-overlay">
-    <div className="healthcare-modal">
-      <div className="healthcare-modal-header">
-        <h3>Create Lab Request</h3>
+        <div className="input-group">
+          <label>Preferred Time *</label>
+          <select
+            name="preferredTime"
+            value={formData.preferredTime}
+            onChange={handleInputChange}
+            className={`form-input ${fieldErrors.preferredTime ? 'invalid' : ''} ${formData.preferredTime ? 'has-value' : 'empty'}`}
+            required
+          >
+            <option value="" disabled hidden>Select preferred time</option>
+            <option value="morning">Morning (8:00 AM - 12:00 PM)</option>
+            <option value="afternoon">Afternoon (12:00 PM - 5:00 PM)</option>
+            <option value="evening">Evening (5:00 PM - 8:00 PM)</option>
+            <option value="anytime">Any available time</option>
+          </select>
+          {showValidation && fieldErrors.preferredTime && (
+            <small className="error-text">{fieldErrors.preferredTime}</small>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSummaryStep = () => (
+    <div className="assessment-card assessment-step-transition">
+      <div className="assessment-step-header">
+        <div className="assessment-step-icon">
+          <i className="fa-solid fa-clipboard-check"></i>
+        </div>
+        <h3>Assessment Summary</h3>
+        <p>Review your information before submitting</p>
+      </div>
+
+      <div className="summary-sections">
+        <div className="summary-section">
+          <h4><i className="fa-solid fa-stethoscope"></i> Selected Symptoms</h4>
+          <div className="summary-symptoms">
+            {formData.symptoms.map((symptom, index) => (
+              <span key={index} className="summary-symptom">{symptom}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="summary-section">
+          <h4><i className="fa-solid fa-notes-medical"></i> Condition Details</h4>
+          <div className="summary-details">
+            <div className="summary-item">
+              <strong>Duration:</strong>
+              <span>{formData.duration.replace('-', ' ')}</span>
+            </div>
+            <div className="summary-item">
+              <strong>Severity:</strong>
+              <span>{formData.severity}</span>
+            </div>
+            {formData.previousTreatment && (
+              <div className="summary-item">
+                <strong>Previous Treatment:</strong>
+                <span>{formData.previousTreatment}</span>
+              </div>
+            )}
+            {formData.allergies && (
+              <div className="summary-item">
+                <strong>Allergies:</strong>
+                <span>{formData.allergies}</span>
+              </div>
+            )}
+            {formData.medications && (
+              <div className="summary-item">
+                <strong>Current Medications:</strong>
+                <span>{formData.medications}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="summary-section">
+          <h4><i className="fa-regular fa-calendar"></i> Appointment Preferences</h4>
+          <div className="summary-details">
+            <div className="summary-item">
+              <strong>Preferred Date:</strong>
+              <span>{formData.preferredDate}</span>
+            </div>
+            <div className="summary-item">
+              <strong>Preferred Time:</strong>
+              <span>{formData.preferredTime}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="recommendation-section">
+          <div className="recommendation-icon">
+            <i className="fa-solid fa-hospital"></i>
+          </div>
+          <div className="recommendation-content">
+            <h4>Recommended Department</h4>
+            <p><strong>{generateDepartmentRecommendation()}</strong></p>
+            <small>Based on your symptoms, we recommend starting with this department. The doctor may refer you to other specialists if needed.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderProgressBar = () => (
+    <div className="progress-container">
+      <div className="progress-steps">
+        {[1, 2, 3, 4].map((step) => (
+          <React.Fragment key={step}>
+            <div className={`progress-step-item ${currentStep >= step ? 'active' : ''}`}>
+              <div className="progress-step">
+                <span className="step-number">
+                  {currentStep > step ? <i className="fa-solid fa-check"></i> : step}
+                </span>
+                <span className="step-label">
+                  {step === 1 ? 'Symptoms' :
+                   step === 2 ? 'Details' :
+                   step === 3 ? 'Schedule' : 'Summary'}
+                </span>
+              </div>
+              {step < 4 && (
+                <div className={`progress-line ${currentStep > step ? 'completed' : ''}`}></div>
+              )}
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return renderSymptomStep();
+      case 2:
+        return renderDetailsStep();
+      case 3:
+        return renderSchedulingStep();
+      case 4:
+        return renderSummaryStep();
+      default:
+        return renderSymptomStep();
+    }
+  };
+
+  const renderNavigationButtons = () => {
+    if (currentStep === 4) {
+      return (
+        <div className="nav-buttons">
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="nav-btn secondary"
+            disabled={loading}
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+          <button 
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="nav-btn submit"
+          >
+            {loading ? (
+              <>
+                <span className="loading-spinner"></span>
+                Submitting...
+              </>
+            ) : (
+              'Generate QR Code'
+            )}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="nav-buttons">
+        {currentStep > 1 && (
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="nav-btn secondary"
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+        )}
         <button 
-          onClick={() => {
-            setShowLabRequestModal(false);
-            setSelectedPatientForLab(null);
-            setLabRequestForm({
-              test_name: '',
-              test_type: '',
-              priority: 'normal',
-              instructions: '',
-              due_date: ''
-            });
-          }}
-          className="healthcare-modal-close"
+          type="button"
+          onClick={nextStep}
+          className="nav-btn primary"
+          disabled={!validateStep(currentStep)}
+        >
+          Continue<i className="fa-solid fa-greater-than"></i>
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="health-assessment">
+      <div className="assessment-header">
+        <div className="assessment-logo">
+          <i className="fa-solid fa-hospital"></i>
+        </div>
+        <div className="assessment-title">
+          <h1>CliCare</h1>
+          <p>Health Assessment</p>
+        </div>
+        <div className="assessment-hospital-info">
+          <p><strong>{formatTime(currentTime)}</strong></p>
+          <p>{formatDate(currentTime)}</p>
+        </div>
+        <button 
+          onClick={() => window.location.href = '/mobile-patient-dashboard'}
+          className="assessment-close"
         >
           ✕
         </button>
       </div>
+
+      {renderProgressBar()}
       
-      <div className="healthcare-modal-content">
-        <div className="healthcare-form-group">
-          <label>Select Patient: *</label>
-          <select 
-            value={selectedPatientForLab?.patient_id || ''}
-            onChange={(e) => {
-              const allAvailablePatients = [...(myPatients || []), ...(overallPatients || [])];
-              const patient = allAvailablePatients.find(p => p.patient_id === e.target.value);
-              setSelectedPatientForLab(patient);
-            }}
-            className="healthcare-form-select"
-            required
-          >
-            <option value="">Choose a patient</option>
-            {/* My Patients Group */}
-            {myPatients && myPatients.length > 0 && (
-              <optgroup label="My Patients (Today)">
-                {myPatients.map(patient => (
-                  <option key={`my-${patient.patient_id}`} value={patient.patient_id}>
-                    {patient.name} ({patient.patient_id}) - {patient.age}y, {patient.sex}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            
-            {/* All Patients Group */}
-            {overallPatients && overallPatients.length > 0 && (
-              <optgroup label="All Patients">
-                {overallPatients
-                  .filter(patient => !myPatients?.find(mp => mp.patient_id === patient.patient_id)) // Avoid duplicates
-                  .map(patient => (
-                    <option key={`all-${patient.patient_id}`} value={patient.patient_id}>
-                      {patient.name} ({patient.patient_id}) - {patient.age}y, {patient.sex}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-          </select>
-          {selectedPatientForLab && (
-            <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
-              Selected: {selectedPatientForLab.name} | Contact: {selectedPatientForLab.contact_no}
-            </small>
-          )}
+      <div className="assessment-content">
+        <div className="assessment-patient-info">
+          <p>Patient: <strong>{patientInfo.name}</strong> | ID: <strong>{patientInfo.patientId}</strong></p>
         </div>
 
-        <div className="healthcare-form-group">
-          <label>Test Name: *</label>
-          <input 
-            type="text"
-            value={labRequestForm.test_name}
-            onChange={(e) => setLabRequestForm(prev => ({
-              ...prev, 
-              test_name: e.target.value
-            }))}
-            placeholder="e.g., Complete Blood Count, Chest X-Ray"
-            className="healthcare-form-input"
-            required
-          />
-        </div>
-
-        <div className="healthcare-form-group">
-          <label>Test Type: *</label>
-          <select 
-            value={labRequestForm.test_type}
-            onChange={(e) => setLabRequestForm(prev => ({
-              ...prev, 
-              test_type: e.target.value
-            }))}
-            className="healthcare-form-select"
-            required
-          >
-            <option value="">Select test type</option>
-            <option value="Blood Test">Blood Test</option>
-            <option value="Urine Test">Urine Test</option>
-            <option value="Stool Test">Stool Test</option>
-            <option value="X-Ray">X-Ray</option>
-            <option value="CT Scan">CT Scan</option>
-            <option value="MRI">MRI</option>
-            <option value="Ultrasound">Ultrasound</option>
-            <option value="ECG">ECG/EKG</option>
-            <option value="Echo">Echocardiogram</option>
-            <option value="Biopsy">Biopsy</option>
-            <option value="Culture">Culture Test</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        <div className="healthcare-form-group">
-          <label>Priority:</label>
-          <select 
-            value={labRequestForm.priority}
-            onChange={(e) => setLabRequestForm(prev => ({
-              ...prev, 
-              priority: e.target.value
-            }))}
-            className="healthcare-form-select"
-          >
-            <option value="normal">Normal</option>
-            <option value="urgent">Urgent</option>
-            <option value="stat">STAT (Immediate)</option>
-          </select>
-        </div>
-
-        <div className="healthcare-form-group">
-          <label>Due Date: *</label>
-          <input 
-            type="date"
-            value={labRequestForm.due_date}
-            onChange={(e) => setLabRequestForm(prev => ({
-              ...prev, 
-              due_date: e.target.value
-            }))}
-            min={new Date().toISOString().split('T')[0]}
-            className="healthcare-form-input"
-            required
-          />
-        </div>
-
-        <div className="healthcare-form-group">
-          <label>Special Instructions:</label>
-          <textarea 
-            value={labRequestForm.instructions}
-            onChange={(e) => setLabRequestForm(prev => ({
-              ...prev, 
-              instructions: e.target.value
-            }))}
-            placeholder="Any special instructions for the patient or lab..."
-            className="healthcare-form-textarea"
-            rows="3"
-          />
-        </div>
+        {error && <div className="assessment-error">{error}</div>}
+        
+        {renderCurrentStep()}
       </div>
 
-      <div className="healthcare-modal-actions">
-        <button 
-          onClick={() => {
-            setShowLabRequestModal(false);
-            setSelectedPatientForLab(null);
-            setLabRequestForm({
-              test_name: '',
-              test_type: '',
-              priority: 'normal',
-              instructions: '',
-              due_date: ''
-            });
-          }}
-          className="healthcare-modal-btn secondary"
-        >
-          Cancel
-        </button>
-        <button 
-          onClick={createLabRequest}
-          disabled={!selectedPatientForLab || !labRequestForm.test_name.trim() || !labRequestForm.test_type || !labRequestForm.due_date}
-          className="healthcare-modal-btn primary"
-        >
-          Create Request
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-    </div>
-  );
-
-  const renderOverview = () => (
-    <div className="healthcare-page-content">
-      <div className="healthcare-page-header">
-        <h2>Dashboard Overview</h2>
-        <p>Welcome back, {staffInfo.name}</p>
-      </div>
-
-      {loading ? (
-        <div className="healthcare-loading-container">
-          <div className="healthcare-loading-spinner"></div>
-          <p>Loading dashboard data...</p>
-        </div>
-      ) : (
-        <>
-          <div className="healthcare-stats-grid">
-            <div className="healthcare-stat-card">
-              <div className="healthcare-stat-icon">👥</div>
-              <div className="healthcare-stat-content">
-                <h3>My Patients</h3>
-                <div className="healthcare-stat-number">{dashboardData.todayStats.myPatients}</div>
-                <small>Today's consultations</small>
-              </div>
-            </div>
-
-            <div className="healthcare-stat-card">
-              <div className="healthcare-stat-icon">👤</div>
-              <div className="healthcare-stat-content">
-                <h3>Overall Patient</h3>
-                <div className="healthcare-stat-number">{totalPatients}</div>
-                <small>Total registered</small>
-              </div>
-            </div>
-
-            <div className="healthcare-stat-card">
-              <div className="healthcare-stat-icon">🧪</div>
-              <div className="healthcare-stat-content">
-                <h3>Lab Results</h3>
-                <div className="healthcare-stat-number">{dashboardData.todayStats.labResults}</div>
-                <small>Available to review</small>
-              </div>
-            </div>
-          </div>
-
-          <div className="healthcare-content-grid">
-            <div className="healthcare-queue-section">
-              <h3>Patient Queue ({patientQueue.length})</h3>
-              {queueLoading ? (
-                <div className="healthcare-loading-spinner"></div>
-              ) : (
-                <div className="healthcare-queue-list">
-                  {patientQueue.length === 0 ? (
-                    <div className="healthcare-queue-empty">
-                      <p>No patients in queue</p>
-                    </div>
-                  ) : (
-                    patientQueue.map((item) => (
-                      <div key={item.queue_id} className="healthcare-queue-item">
-                        <div className="healthcare-queue-number">#{item.queue_no}</div>
-                        <div className="healthcare-queue-content">
-                          <div className="healthcare-queue-patient">
-                            {item.visit.outPatient.name}
-                          </div>
-                          <div className="healthcare-queue-id">
-                            {item.visit.outPatient.patient_id}
-                          </div>
-                          <div className="healthcare-queue-symptoms">
-                            {item.visit.symptoms}
-                          </div>
-                          <div className="healthcare-queue-time">
-                            {new Date(item.visit.visit_time).toLocaleTimeString()}
-                          </div>
-                        </div>
-                        <div className="healthcare-queue-actions">
-                          {item.status === 'waiting' && (
-                            <button 
-                              onClick={() => updateQueueStatus(item.queue_id, 'in_progress')}
-                              className="healthcare-action-btn start"
-                            >
-                              Start Consultation
-                            </button>
-                          )}
-                          {item.status === 'in_progress' && (
-                            <button 
-                              onClick={() => updateQueueStatus(item.queue_id, 'completed')}
-                              className="healthcare-action-btn complete"
-                            >
-                              Mark Complete
-                            </button>
-                          )}
-                          <div className={`healthcare-queue-status ${item.status}`}>
-                            {item.status === 'waiting' ? '⏳ Waiting' : 
-                             item.status === 'in_progress' ? '🔄 In Progress' : '✅ Complete'}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="healthcare-activity-section">
-              <h3>Quick Actions</h3>
-              <div className="healthcare-quick-actions">
-                <button 
-                  onClick={fetchPatientQueue} 
-                  className="healthcare-action-btn"
-                  disabled={queueLoading}
-                >
-                  🔄 Refresh Queue
-                </button>
-                <button 
-                  onClick={() => setCurrentPage('overall-patients')}
-                  className="healthcare-action-btn"
-                >
-                  👥 View All Patients
-                </button>
-                <button className="healthcare-action-btn">💊 New Prescription</button>
-                <button 
-                  onClick={() => setCurrentPage('lab-orders')}
-                  className="healthcare-action-btn"
-                >
-                  🧪 Order Lab Test
-                </button>
-                <button 
-                  onClick={() => setCurrentPage('patients')}
-                  className="healthcare-action-btn"
-                >
-                  📋 Patient History
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const renderPlaceholderPage = (title, description) => (
-    <div className="healthcare-page-content">
-      <div className="healthcare-page-header">
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </div>
-      <div className="healthcare-placeholder">
-        <div className="healthcare-placeholder-icon">🚧</div>
-        <h3>Coming Soon</h3>
-        <p>This feature is currently under development and will be available in the next release.</p>
-        <button 
-          onClick={() => setCurrentPage('overview')}
-          className="healthcare-back-btn"
-        >
-          ← Back to Dashboard
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderMyPatientsPage = () => (
-    <div className="healthcare-page-content">
-      <div className="healthcare-page-header">
-        <h2>My Patients</h2>
-        <p>Today's consultations and queue for {staffInfo.department}</p>
-      </div>
-
-      <div className="healthcare-patients-layout">
-        {/* Patient List */}
-        <div className="healthcare-patients-list">
-          <div className="healthcare-patients-header">
-            <h3>Today's Patients ({myPatients.length})</h3>
-            <button 
-              onClick={fetchMyPatients}
-              className="healthcare-refresh-btn"
-            >
-              🔄 Refresh
-            </button>
-          </div>
-          
-          {myPatients.length === 0 ? (
-            <div className="healthcare-no-patients">
-              <div className="healthcare-no-data-icon">👥</div>
-              <h4>No patients found</h4>
-              <p>No patients in queue or completed consultations for today.</p>
-            </div>
-          ) : (
-            <div className="healthcare-patient-cards">
-              {/* Queue Patients First */}
-              {myPatients.filter(patient => patient.isInQueue).map((patient) => (
-                <div 
-                  key={`queue-${patient.patient_id}`}
-                  className={`healthcare-patient-card queue-patient ${selectedPatient?.patient_id === patient.patient_id ? 'active' : ''}`}
-                  onClick={() => fetchPatientHistory(patient.patient_id)}
-                >
-                  <div className="healthcare-patient-info">
-                    <div className="healthcare-patient-name">
-                      {patient.name} 
-                      <span className="queue-indicator">#{patient.queueNumber}</span>
-                    </div>
-                    <div className="healthcare-patient-id">{patient.patient_id}</div>
-                    <div className="healthcare-patient-details">
-                      {patient.age} years old, {patient.sex}
-                    </div>
-                    <div className="healthcare-patient-contact">{patient.contact_no}</div>
-                    <div className="patient-symptoms">
-                      <strong>Symptoms:</strong> {patient.lastSymptoms}
-                    </div>
-                  </div>
-                  <div className="healthcare-patient-status">
-                    <div className="healthcare-visit-time">
-                      Visit: {new Date(`1970-01-01T${patient.visitTime}`).toLocaleTimeString()}
-                    </div>
-                    <div className={`healthcare-queue-status ${patient.queueStatus}`}>
-                      {patient.queueStatus === 'waiting' ? '⏳ Waiting' : 
-                       patient.queueStatus === 'in_progress' ? '🔄 In Progress' : patient.queueStatus}
-                    </div>
-                  </div>
-                  {patient.queueStatus === 'in_progress' && (
-                    <div className="current-consultation">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedPatientForLab(patient);
-                          setShowLabRequestModal(true);
-                        }}
-                        className="healthcare-action-btn lab-request"
-                      >
-                        🧪 Request Lab
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {/* Separator */}
-              {myPatients.filter(patient => patient.isInQueue).length > 0 && 
-               myPatients.filter(patient => !patient.isInQueue).length > 0 && (
-                <div className="patients-separator">
-                  <h4>Completed Today</h4>
-                </div>
-              )}
-              
-              {/* Completed Patients */}
-              {myPatients.filter(patient => !patient.isInQueue).map((patient) => (
-                <div 
-                  key={`completed-${patient.patient_id}`}
-                  className={`healthcare-patient-card completed-patient ${selectedPatient?.patient_id === patient.patient_id ? 'active' : ''}`}
-                  onClick={() => fetchPatientHistory(patient.patient_id)}
-                >
-                  <div className="healthcare-patient-info">
-                    <div className="healthcare-patient-name">{patient.name}</div>
-                    <div className="healthcare-patient-id">{patient.patient_id}</div>
-                    <div className="healthcare-patient-details">
-                      {patient.age} years old, {patient.sex}
-                    </div>
-                    <div className="healthcare-patient-contact">{patient.contact_no}</div>
-                  </div>
-                  <div className="healthcare-patient-status">
-                    <div className="healthcare-last-visit">
-                      Completed: {new Date(`1970-01-01T${patient.visitTime}`).toLocaleTimeString()}
-                    </div>
-                    <div className={`healthcare-queue-status ${patient.queueStatus}`}>
-                      ✅ Completed
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Patient History */}
-        <div className="healthcare-patient-history">
-          {selectedPatient ? (
-            <>
-              <div className="healthcare-history-header">
-                <div className="healthcare-selected-patient">
-                  <h3>{selectedPatient.name}</h3>
-                  <div className="healthcare-patient-summary">
-                    <span>ID: {selectedPatient.patient_id}</span>
-                    <span>{selectedPatient.age} years old, {selectedPatient.sex}</span>
-                    <span>📞 {selectedPatient.contact_no}</span>
-                    <span>📧 {selectedPatient.email}</span>
-                  </div>
-                  {selectedPatient.emergencyContact && selectedPatient.emergencyContact.length > 0 && (
-                    <div className="healthcare-emergency-contact">
-                      <strong>Emergency Contact:</strong> {selectedPatient.emergencyContact[0].name} 
-                      ({selectedPatient.emergencyContact[0].relationship}) - {selectedPatient.emergencyContact[0].contact_number}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {historyLoading ? (
-                <div className="healthcare-loading-container">
-                  <div className="healthcare-loading-spinner"></div>
-                  <p>Loading medical history...</p>
-                </div>
-              ) : (
-                <div className="healthcare-history-content">
-                  {patientHistory.length === 0 ? (
-                    <div className="healthcare-no-history">
-                      <div className="healthcare-no-data-icon">📋</div>
-                      <h4>No medical history available</h4>
-                      <p>This patient has no recorded visits or medical records.</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="healthcare-history-stats">
-                        <div className="healthcare-stat-item">
-                          <span className="stat-number">{historyPagination.totalVisits}</span>
-                          <span className="stat-label">Total Visits</span>
-                        </div>
-                        <div className="healthcare-stat-item">
-                          <span className="stat-number">
-                            {new Date(selectedPatient.registration_date).toLocaleDateString()}
-                          </span>
-                          <span className="stat-label">Registered</span>
-                        </div>
-                      </div>
-
-                      <div className="healthcare-history-timeline">
-                        {patientHistory.map((visit) => (
-                          <div key={visit.visit_id} className="healthcare-timeline-item">
-                            <div className="healthcare-timeline-date">
-                              <div className="date-day">
-                                {new Date(visit.visit_date).getDate()}
-                              </div>
-                              <div className="date-month">
-                                {new Date(visit.visit_date).toLocaleDateString('en-US', { month: 'short' })}
-                              </div>
-                              <div className="date-year">
-                                {new Date(visit.visit_date).getFullYear()}
-                              </div>
-                            </div>
-                            
-                            <div className="healthcare-timeline-content">
-                              <div className="healthcare-visit-header">
-                                <h4>{visit.appointment_type}</h4>
-                                <span className="visit-time">
-                                  {new Date(`1970-01-01T${visit.visit_time}`).toLocaleTimeString('en-US', { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
-                                </span>
-                              </div>
-
-                              <div className="healthcare-visit-details">
-                                <div className="healthcare-symptoms">
-                                  <strong>Chief Complaint:</strong> {visit.symptoms}
-                                </div>
-
-                                {visit.diagnosis && visit.diagnosis.length > 0 && (
-                                  <div className="healthcare-diagnoses">
-                                    <strong>Diagnoses:</strong>
-                                    {visit.diagnosis.map((diag) => (
-                                      <div key={diag.diagnosis_id} className="healthcare-diagnosis-item">
-                                        <div className="diagnosis-header">
-                                          <span className={`diagnosis-type ${diag.diagnosis_type}`}>
-                                            {diag.diagnosis_type}
-                                          </span>
-                                          <span className={`diagnosis-severity ${diag.severity}`}>
-                                            {diag.severity}
-                                          </span>
-                                        </div>
-                                        <div className="diagnosis-desc">{diag.diagnosis_description}</div>
-                                        {diag.notes && (
-                                          <div className="diagnosis-notes">
-                                            <strong>Notes:</strong> {diag.notes}
-                                          </div>
-                                        )}
-                                        {diag.healthStaff && (
-                                          <div className="diagnosis-doctor">
-                                            <strong>Diagnosed by:</strong> Dr. {diag.healthStaff.name} ({diag.healthStaff.specialization})
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {visit.queue && visit.queue.length > 0 && (
-                                  <div className="healthcare-visit-queue-info">
-                                    <div className="queue-department">
-                                      <strong>Department:</strong> {visit.queue[0].department.name}
-                                    </div>
-                                    <div className="queue-number">
-                                      <strong>Queue Number:</strong> #{visit.queue[0].queue_no}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Pagination */}
-                      {historyPagination.totalPages > 1 && (
-                        <div className="healthcare-pagination">
-                          <button
-                            onClick={() => fetchPatientHistory(selectedPatient.patient_id, historyPagination.currentPage - 1)}
-                            disabled={historyPagination.currentPage === 1}
-                            className="healthcare-page-btn"
-                          >
-                            Previous
-                          </button>
-                          
-                          <span className="healthcare-page-info">
-                            Page {historyPagination.currentPage} of {historyPagination.totalPages}
-                          </span>
-                          
-                          <button
-                            onClick={() => fetchPatientHistory(selectedPatient.patient_id, historyPagination.currentPage + 1)}
-                            disabled={!historyPagination.hasNextPage}
-                            className="healthcare-page-btn"
-                          >
-                            Next
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="healthcare-select-patient">
-              <div className="healthcare-no-data-icon">👈</div>
-              <h4>Select a patient</h4>
-              <p>Choose a patient from the list to view their medical history</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderOverallPatientsPage = () => (
-    <div className="healthcare-page-content">
-      <div className="healthcare-page-header">
-        <h2>Overall Patient</h2>
-        <p>All registered patients in the system ({totalPatients} total)</p>
-      </div>
-
-      {overallLoading ? (
-        <div className="healthcare-loading-container">
-          <div className="healthcare-loading-spinner"></div>
-          <p>Loading all patients...</p>
-        </div>
-      ) : (
-        <div className="healthcare-overall-patients">
-          <div className="healthcare-patients-table-container">
-            <table className="healthcare-patients-table">
-              <thead>
-                <tr>
-                  <th>Patient ID</th>
-                  <th>Name</th>
-                  <th>Age</th>
-                  <th>Sex</th>
-                  <th>Contact</th>
-                  <th>Registration Date</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overallPatients.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="healthcare-no-data">
-                      <div className="healthcare-no-data-icon">👥</div>
-                      <p>No patients found</p>
-                    </td>
-                  </tr>
-                ) : (
-                  overallPatients.map((patient) => (
-                    <tr 
-                      key={patient.patient_id}
-                      className="healthcare-table-row"
-                      onClick={() => fetchPatientModal(patient.patient_id)}
-                    >
-                      <td>{patient.patient_id}</td>
-                      <td className="healthcare-patient-name-cell">{patient.name}</td>
-                      <td>{patient.age}</td>
-                      <td>{patient.sex}</td>
-                      <td>{patient.contact_no}</td>
-                      <td>{new Date(patient.registration_date).toLocaleDateString()}</td>
-                      <td>
-                        <button 
-                          className="healthcare-view-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            fetchPatientModal(patient.patient_id);
-                          }}
-                        >
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Patient Details Modal */}
-      {selectedPatientModal && (
-        <div className="healthcare-modal-overlay" onClick={() => setSelectedPatientModal(null)}>
-          <div className="healthcare-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="healthcare-modal-header">
-              <h3>Patient Information</h3>
-              <button 
-                className="healthcare-modal-close"
-                onClick={() => setSelectedPatientModal(null)}
-              >
-                ✕
-              </button>
-            </div>
-            
-            {modalLoading ? (
-              <div className="healthcare-modal-loading">
-                <div className="healthcare-loading-spinner"></div>
-                <p>Loading patient details...</p>
-              </div>
-            ) : (
-              <div className="healthcare-modal-content">
-                <div className="healthcare-modal-section">
-                  <h4>Personal Information</h4>
-                  <div className="healthcare-modal-grid">
-                    <div><strong>Patient ID:</strong> {selectedPatientModal.patient_id}</div>
-                    <div><strong>Name:</strong> {selectedPatientModal.name}</div>
-                    <div><strong>Age:</strong> {selectedPatientModal.age} years</div>
-                    <div><strong>Sex:</strong> {selectedPatientModal.sex}</div>
-                    <div><strong>Birthday:</strong> {new Date(selectedPatientModal.birthday).toLocaleDateString()}</div>
-                    <div><strong>Registration:</strong> {new Date(selectedPatientModal.registration_date).toLocaleDateString()}</div>
-                  </div>
-                </div>
-
-                <div className="healthcare-modal-section">
-                  <h4>Contact Information</h4>
-                  <div className="healthcare-modal-grid">
-                    <div><strong>Phone:</strong> {selectedPatientModal.contact_no}</div>
-                    <div><strong>Email:</strong> {selectedPatientModal.email}</div>
-                    <div><strong>Address:</strong> {selectedPatientModal.address}</div>
-                  </div>
-                </div>
-
-                {selectedPatientModal.emergencyContact && selectedPatientModal.emergencyContact.length > 0 && (
-                  <div className="healthcare-modal-section">
-                    <h4>Emergency Contact</h4>
-                    <div className="healthcare-modal-grid">
-                      <div><strong>Name:</strong> {selectedPatientModal.emergencyContact[0].name}</div>
-                      <div><strong>Relationship:</strong> {selectedPatientModal.emergencyContact[0].relationship}</div>
-                      <div><strong>Phone:</strong> {selectedPatientModal.emergencyContact[0].contact_number}</div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="healthcare-modal-actions">
-                  <button 
-                    className="healthcare-modal-btn primary"
-                    onClick={() => {
-                      setSelectedPatientModal(null);
-                      fetchPatientHistory(selectedPatientModal.patient_id);
-                      setCurrentPage('patients');
-                    }}
-                  >
-                    View Medical History
-                  </button>
-                  <button 
-                    className="healthcare-modal-btn"
-                    onClick={() => setSelectedPatientModal(null)}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderCurrentPage = () => {
-    if (currentPage === 'overview') {
-      return renderOverview();
-    } else if (currentPage === 'patients') {
-      return renderMyPatientsPage();
-    } else if (currentPage === 'overall-patients') {
-      return renderOverallPatientsPage();
-    } else if (currentPage === 'lab-orders') {
-      return renderLabOrdersPage();
-    }
-    
-    const menuItems = getMenuItems();
-    const currentItem = menuItems.find(item => item.id === currentPage);
-    
-    if (currentItem) {
-      return renderPlaceholderPage(currentItem.label, currentItem.description);
-    }
-    
-    return renderOverview();
-  };
-
-  return (
-    <div className="healthcare-dashboard">
-      {/* Mobile Header */}
-      <div className="healthcare-mobile-header">
-        <button 
-          className="healthcare-sidebar-toggle"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          ☰
-        </button>
-        <div className="healthcare-mobile-logo">
-          <span className="healthcare-mobile-icon">🏥</span>
-          <span className="healthcare-mobile-title">CLICARE Healthcare</span>
-        </div>
-        <button className="healthcare-mobile-logout" onClick={handleLogout}>
-          🚪
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <div className={`healthcare-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="healthcare-sidebar-header">
-          <div className="healthcare-sidebar-logo">
-            <span className="healthcare-sidebar-icon">🏥</span>
-            <div className="healthcare-sidebar-text">
-              <h1>CLICARE</h1>
-              <p>Healthcare Portal</p>
-            </div>
-          </div>
-          <button 
-            className="healthcare-sidebar-close"
-            onClick={() => setSidebarOpen(false)}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="healthcare-user-info">
-          <div className="healthcare-user-avatar">👨‍⚕️</div>
-          <div className="healthcare-user-details">
-            <div className="healthcare-user-name">{staffInfo.name}</div>
-            <div className="healthcare-user-role">{staffInfo.role}</div>
-            <div className="healthcare-user-department">{staffInfo.department}</div>
-            <div className="healthcare-user-id">{staffInfo.staffId}</div>
-          </div>
-        </div>
-
-        <nav className="healthcare-navigation">
-          {getMenuItems().map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setCurrentPage(item.id);
-                setSidebarOpen(false);
-              }}
-              className={`healthcare-nav-item ${currentPage === item.id ? 'active' : ''}`}
-            >
-              <span className="healthcare-nav-icon">{item.icon}</span>
-              <div className="healthcare-nav-content">
-                <div className="healthcare-nav-label">{item.label}</div>
-                <div className="healthcare-nav-description">{item.description}</div>
-              </div>
-            </button>
-          ))}
-        </nav>
-
-        <div className="healthcare-sidebar-footer">
-          <button onClick={handleLogout} className="healthcare-logout-btn">
-            <span>🚪</span>
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="healthcare-sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
-
-      {/* Main Content */}
-      <div className="healthcare-main-content">
-        {renderCurrentPage()}
+      <div className="assessment-nav-container">
+        {renderNavigationButtons()}
       </div>
     </div>
   );
 };
 
-export default HealthcareDashboard;
+export default MobileHealthAssessment;
