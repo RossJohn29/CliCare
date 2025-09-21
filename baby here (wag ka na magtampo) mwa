@@ -1,1115 +1,308 @@
-// mobilepatientregistration.js - Aligned with Terminal Design
-import React, { useState, useEffect } from 'react';
-import './mobilepatientregistration.css';
-import sampleID from "../../sampleID.png";
+// tesseractOCR.js
 import Tesseract from 'tesseract.js';
 
-const MobilePatientRegistration = () => {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    sex: '',
-    birthday: '',
-    age: '',
-    address: '',
-    contactNumber: '',
-    email: '',
+/**
+ * Main OCR processing function
+ * @param {string} imageData - Base64 image data from canvas
+ * @returns {Promise<Object>} - OCR result with extracted name
+ */
+export const processIDWithOCR = async (imageData) => {
+  try {
+    const { data: { text } } = await Tesseract.recognize(imageData, 'eng', {
+      logger: m => console.log('OCR Progress:', m)
+    });
     
-    emergencyContactName: '',
-    emergencyContactNumber: '',
-    emergencyRelationship: '',
+    console.log('OCR Raw Text Result:', text);
     
-    idType: '',
-    idNumber: ''
-  });
+    const extractedName = extractNameFromID(text);
+    
+    return {
+      success: !!extractedName,
+      name: extractedName,
+      rawText: text,
+      message: extractedName 
+        ? 'Name extracted successfully!' 
+        : 'Could not extract name from ID.<br />Please try again or enter manually.'
+    };
+    
+  } catch (error) {
+    console.error('OCR processing error:', error);
+    return {
+      success: false,
+      name: null,
+      rawText: '',
+      message: 'Failed to process ID image. Please try again.',
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Extract name from OCR text - Enhanced for PLM ID and Philippine Government ID accuracy
+ * @param {string} text - Raw OCR text
+ * @returns {string|null} - Extracted name or null
+ */
+export const extractNameFromID = (text) => {
+  const lines = text.split('\n').map(line => line.trim().toUpperCase()).filter(line => line.length > 0);
   
-  const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [idScanMode, setIdScanMode] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [showCameraModal, setShowCameraModal] = useState(false);
-  const [cameraStream, setCameraStream] = useState(null);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [showValidation, setShowValidation] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [currentStep]);
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    let processedValue = value;
-
-    if (['fullName', 'emergencyContactName', 'address'].includes(name)) {
-      processedValue = toTitleCase(value);
-    } else if (name === 'email') {
-      processedValue = value.toLowerCase();
-    } else if (['contactNumber', 'emergencyContactNumber'].includes(name)) {
-      processedValue = formatPhoneNumber(value);
-    }
-
-    setFormData(prev => {
-      const updated = { ...prev, [name]: processedValue };
+  console.log('OCR Processing Lines:', lines);
   
-      if (name === 'birthday') {
-        updated.age = calculateAge(processedValue);
-      }
-      
-      return updated;
-    });
-
-    setError('');
-
-    if (showValidation) {
-      setShowValidation(false);
-      setFieldErrors({});
-    }
-  };
-
-  const toTitleCase = (str) => {
-    if (!str) return '';
-    return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const formatPhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const limited = cleaned.slice(0, 11);
-
-    if (limited.length >= 8) {
-      return limited.replace(/(\d{4})(\d{3})(\d{4})/, '$1-$2-$3');
-    } else if (limited.length >= 5) {
-      return limited.replace(/(\d{4})(\d{1,3})/, '$1-$2');
-    }
-    return limited;
-  };
-
-  const cleanPhoneNumber = (value) => {
-    return value.replace(/\D/g, '');
-  };
-
-  const validatePhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    
-    if (!cleaned) return 'Contact number is required';
-    if (cleaned.length < 11) return 'Contact number must be 11 digits';
-    if (cleaned.length > 11) return 'Contact number must be exactly 11 digits';
-    if (!cleaned.startsWith('09')) return 'Contact number must start with 09';
-    
-    return null;
-  };
-
-  const validateEmail = (email) => {
-    if (!email) return 'Email address is required';
-    if (!email.includes('@')) return 'Email must contain @';
-    if (!email.match(/\.[a-zA-Z]{2,}$/)) return 'Email must contain a valid domain (e.g., .com, .org)';
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.toLowerCase())) return 'Please enter a valid email format';
-    
-    return null;
-  };
-
-  const validateFullName = (name) => {
-    if (!name.trim()) return 'Full name is required';
-    const words = name.trim().split(/\s+/);
-    if (words.length < 2) return 'Please enter your full name';
-    if (/\./.test(name)) return 'Do not use initials (write full middle name instead)';
-    return null;
-  };
-
-  const validateAddress = (address) => {
-    if (!address.trim()) return 'Complete address is required';
-    const parts = address.split(' ').map(p => p.trim()).filter(Boolean);
-    if (parts.length < 4) {
-      return 'Please follow the format: House No., Street, Barangay, City, Province';
-    }
-    return null;
-  };
-
-  const checkCameraPermissions = async () => {
-    try {
-      const permissions = await navigator.permissions.query({ name: 'camera' });
-      
-      if (permissions.state === 'denied') {
-        setCameraError('Camera access is blocked. Please enable camera permissions in your browser settings and refresh the page.');
-        return false;
-      }
-      
-      return true;
-    } catch (err) {
-      return true;
-    }
-  };
-
-  const handleIDScanClick = () => {
-    setShowCameraModal(true);
-    setCameraError('');
-  };
-
-  useEffect(() => {
-    if (showCameraModal) {
-      initializeCamera();
-    } else {
-      cleanupCamera();
-    }
-    
-    return () => cleanupCamera();
-  }, [showCameraModal]);
-
-  const initializeCamera = async () => {
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported in this browser or requires HTTPS');
-      }
-
-      const constraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920, min: 640, max: 1920 },
-          height: { ideal: 1080, min: 480, max: 1080 }
-        }
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setCameraStream(stream);
-      
-      setTimeout(() => {
-        const videoElement = document.getElementById('mobile-camera-feed');
-        if (videoElement) {
-          videoElement.srcObject = stream;
-          videoElement.setAttribute('playsinline', '');
-          videoElement.setAttribute('webkit-playsinline', '');
-          videoElement.muted = true;
-          
-          const playPromise = videoElement.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.log('Video play failed:', error);
-            });
-          }
-        }
-      }, 100);
-    } catch (err) {
-      console.error('Camera access error:', err);
-      
-      let errorMessage = '';
-      
-      if (err.message.includes('Camera API not supported')) {
-        errorMessage = 'Camera scanning requires HTTPS connection. Please access this page using https:// or use a modern browser.';
-      } else if (err.name === 'NotAllowedError') {
-        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No camera found on this device.';
-      } else if (err.name === 'NotSupportedError') {
-        errorMessage = 'Camera not supported on this device or browser.';
-      } else {
-        errorMessage = 'Camera access failed. Please try again or enter information manually.';
-      }
-      
-      setCameraError(errorMessage);
-    }
-  };
-
-  const isCameraAvailable = () => {
-    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  };
-
-  const cleanupCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
-    }
-  };
-
-  const handleCaptureID = () => {
-    const videoElement = document.getElementById('mobile-camera-feed');
-    
-    if (!videoElement || !videoElement.srcObject) {
-      setCameraError('Camera not ready. Please wait and try again.');
-      return;
-    }
-
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    
-    canvas.width = videoElement.videoWidth || 1280;
-    canvas.height = videoElement.videoHeight || 720;
-    
-    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-    
-    const capturedImageData = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedImage(capturedImageData);
-    
-    processIDWithOCR(capturedImageData);
-  };
-
-  const processIDWithOCR = async (imageData) => {
-    setOcrLoading(true);
-    setIdScanMode(true);
-    
-    try {
-      const { data: { text } } = await Tesseract.recognize(imageData, 'eng', {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        },
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1',
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz,0123456789',
-      });
-      
-      console.log('OCR Result:', text);
-      
-      const extractedName = extractNameFromID(text);
-      
-      if (extractedName) {
-        if (navigator.vibrate) {
-          navigator.vibrate([100, 50, 100]);
-        }
-        
-        setFormData(prev => ({
-          ...prev,
-          fullName: extractedName
-        }));
-        
-        setShowCameraModal(false);
-        setError('');
-        
-        alert('ID scanned successfully! Name has been filled in the form.');
-        
-      } else {
-        setCameraError(
-          <>
-            Could not extract name from ID. <br />
-            Please try again or enter manually.
-          </>
-        );
-      }
-      
-    } catch (err) {
-      console.error('OCR processing error:', err);
-      setCameraError('Failed to process the ID image. Please ensure good lighting and try again.');
-    } finally {
-      setOcrLoading(false);
-      setIdScanMode(false);
-    }
-  };
-
-  const extractNameFromID = (text) => {
-    const lines = text.split('\n').map(line => line.trim().toUpperCase());
-    
-    const namePattern = /([A-Z\s]+),\s*([A-Z\s]+)/;
-    
-    for (let line of lines) {
-      if (line.includes('REPUBLIC') || line.includes('PHILIPPINES') || 
-          line.includes('DEPARTMENT') || line.includes('TRANSPORTATION') ||
-          line.includes('DRIVER') || line.includes('LICENSE')) {
-        continue;
-      }
-      
-      const nameMatch = line.match(namePattern);
-      if (nameMatch) {
-        const lastName = nameMatch[1].trim();
-        const firstMiddle = nameMatch[2].trim();
-        return `${firstMiddle} ${lastName}`;
-      }
-      
-      if (line.length > 10 && line.length < 50 && 
-          /^[A-Z\s]+$/.test(line) && 
-          !line.includes('MALE') && !line.includes('FEMALE') &&
-          !line.includes('PHL') && !line.includes('NCR')) {
-        
-        const words = line.split(/\s+/).filter(word => word.length > 1);
-        if (words.length >= 2 && words.length <= 4) {
-          return line;
-        }
-      }
-    }
-    
-    return null;
-  };
-
-  const closeCameraModal = () => {
-    setShowCameraModal(false);
-    setCapturedImage(null);
-    setCameraError('');
-  };
-
-  const validateStep = (step) => {
-    switch (step) {
-      case 1:
-        return (
-          validateFullName(formData.fullName) === null &&
-          formData.sex &&
-          formData.birthday &&
-          validateAddress(formData.address) === null &&
-          validatePhoneNumber(formData.contactNumber) === null &&
-          validateEmail(formData.email) === null
-        );
-      case 2:
-        return (
-          validateFullName(formData.emergencyContactName) === null &&
-          validatePhoneNumber(formData.emergencyContactNumber) === null &&
-          formData.emergencyRelationship &&
-          formData.emergencyContactNumber !== formData.contactNumber
-        );
-      case 3:
-        return (
-          formData.fullName &&
-          formData.sex &&
-          formData.birthday &&
-          formData.address &&
-          formData.contactNumber &&
-          formData.email &&
-          formData.emergencyContactName &&
-          formData.emergencyContactNumber &&
-          formData.emergencyRelationship &&
-          termsAccepted
-        );
-      default:
-        return true;
-    }
-  };
-
-  const nextStep = () => {
-    const stepErrors = {};
-
-    if (currentStep === 1) {
-      if (!formData.fullName.trim()) {
-        stepErrors.fullName = 'Full name is required';
-      } else if (validateFullName(formData.fullName)) {
-        stepErrors.fullName = validateFullName(formData.fullName);
-      }
-
-      if (!formData.sex) stepErrors.sex = 'Select your sex';
-
-      if (!formData.birthday) {
-        stepErrors.birthday = 'Select your date of birth';
-      } else if (validateAge(formData.birthday)) {
-        stepErrors.birthday = validateAge(formData.birthday);
-      }
-
-      if (!formData.address.trim()) {
-        stepErrors.address = 'Complete address is required';
-      } else if (validateAddress(formData.address)) {
-        stepErrors.address = validateAddress(formData.address);
-      }
-
-      if (!formData.contactNumber) {
-        stepErrors.contactNumber = 'Contact number is required';
-      } else if (validatePhoneNumber(formData.contactNumber)) {
-        stepErrors.contactNumber = validatePhoneNumber(formData.contactNumber);
-      }
-
-      if (!formData.email) {
-        stepErrors.email = 'Email address is required';
-      } else if (validateEmail(formData.email)) {
-        stepErrors.email = validateEmail(formData.email);
-      }
-    }
-
-    if (currentStep === 2) {
-      if (!formData.emergencyContactName.trim()) {
-        stepErrors.emergencyContactName = 'Emergency contact name is required';
-      } else if (validateFullName(formData.emergencyContactName)) {
-        stepErrors.emergencyContactName = validateFullName(formData.emergencyContactName);
-      }
-
-      if (!formData.emergencyContactNumber) {
-        stepErrors.emergencyContactNumber = 'Emergency contact number is required';
-      } else if (validatePhoneNumber(formData.emergencyContactNumber)) {
-        stepErrors.emergencyContactNumber = validatePhoneNumber(formData.emergencyContactNumber);
-      }
-
-      if (!formData.emergencyRelationship) {
-        stepErrors.emergencyRelationship = 'Select your relationship';
-      }
-
-      if (formData.emergencyContactNumber === formData.contactNumber) {
-        stepErrors.emergencyContactNumber = 'Emergency contact number cannot be the same as patient\'s number';
-      }
-    }
-
-     if (currentStep === 3 && !termsAccepted) {
-      stepErrors.termsAccepted = 'Please accept the terms and conditions';
-    }
-
-    setFieldErrors(stepErrors);
-    setShowValidation(true);
-
-    if (Object.keys(stepErrors).length === 0) {
-      if (currentStep < 3) {
-        setCurrentStep(currentStep + 1);
-        setShowValidation(false);
-        setError('');
-      } else if (currentStep === 3) {
-        handleSubmit();
-      }
-    }
-  };
-
-  const prevStep = () => {
-    setCurrentStep(currentStep - 1);
-    setError('');
-  };
-
-  const generatePatientId = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    return `PAT${timestamp}`;
-  };
-
-  const handleSubmit = async () => {
-    if (!termsAccepted) {
-      setShowValidation(true);
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const calculatedAge = formData.age || calculateAge(formData.birthday);
-
-      const registrationData = {
-        name: formData.fullName,
-        birthday: formData.birthday,
-        age: parseInt(calculatedAge),
-        sex: formData.sex,
-        address: formData.address,
-        contact_no: cleanPhoneNumber(formData.contactNumber),
-        email: formData.email.toLowerCase(),
-        emergency_contact_name: formData.emergencyContactName,
-        emergency_contact_relationship: formData.emergencyRelationship,
-        emergency_contact_no: cleanPhoneNumber(formData.emergencyContactNumber),
-        preferred_time: new Date().toISOString(),
-        created_date: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      };
-
-      console.log('Submitting registration data:', registrationData);
-
-      const response = await fetch('http://localhost:5000/api/temp-registration', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(registrationData)
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Registration failed');
-      }
-
-      console.log('Registration successful:', result);
-
-      const tempRegId = result.temp_id;
-      const tempPatientId = result.temp_patient_id;
-
-      sessionStorage.setItem('tempRegId', tempRegId);
-      sessionStorage.setItem('tempPatientId', tempPatientId);
-      sessionStorage.setItem('patientName', formData.fullName);
-      sessionStorage.setItem('patientEmail', formData.email);
-      sessionStorage.setItem('registrationSuccess', 'true');
-
-      window.location.href = '/mobile-health-assessment';
-
-    } catch (err) {
-      console.error('Registration error:', err);
-      setError(err.message || 'Registration failed. Please check your internet connection and try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateAge = (birthday) => {
-    if (!birthday) return '';
-    const today = new Date();
-    const birthDate = new Date(birthday);
-
-    if (birthDate > today) return '';
-    
-    let years = today.getFullYear() - birthDate.getFullYear();
-    let months = today.getMonth() - birthDate.getMonth();
-    let days = today.getDate() - birthDate.getDate();
-    
-    if (days < 0) {
-      months--;
-      const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      days += lastMonth.getDate();
-    }
-    
-    if (months < 0) {
-      years--;
-      months += 12;
-    }
-
-    if (years > 120) return 'invalid';
-
-    if (years === 0 && months === 0) {
-      return days === 1 ? '1 day old' : `${days} days old`;
-    } else if (years === 0) {
-      return months === 1 ? '1 month old' : `${months} months old`;
-    } else {
-      return years;
-    }
-  };
-
-const validateAge = (birthday) => {
-  if (!birthday) return 'Date of birth is required';
-  const age = calculateAge(birthday);
-  if (age === 'invalid') return 'Enter a valid date of birth';
-  if (age === '') return 'Date of birth is invalid';
+  // Priority 1: PLM ID format detection
+  const plmName = extractPLMName(lines);
+  if (plmName) {
+    console.log('✅ PLM Student name extracted:', plmName);
+    return plmName;
+  }
+  
+  // Priority 2: Philippine Government ID format
+  console.log('No PLM ID detected, trying Government ID format...');
+  const governmentName = extractGovernmentIDName(lines);
+  if (governmentName) {
+    console.log('✅ Government ID name extracted:', governmentName);
+    return governmentName;
+  }
+  
+  // Priority 3: Generic name pattern fallback
+  console.log('Trying generic name patterns...');
+  const genericName = extractGenericName(lines);
+  if (genericName) {
+    console.log('✅ Generic name pattern found:', genericName);
+    return genericName;
+  }
+  
+  console.log('❌ No valid name found in OCR text');
   return null;
 };
 
-  const renderCameraModal = () => {
-    if (!showCameraModal) return null;
-    return (
-      <div className="mobile-cmodal-overlay" onClick={(e) => e.target === e.currentTarget && closeCameraModal()}>
-        <div className="mobile-cmodal mobile-camera-modal">
-          <div className="mobile-cmodal-header">
-            <h3>Scan Philippine ID</h3>
-            <button 
-              onClick={closeCameraModal}
-              className="mobile-cmodal-close"
-            >
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-          
-          <div className="mobile-cmodal-content">
-            {cameraError ? (
-              <div className="mobile-camera-error">
-                <div className="mobile-error-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <p>{cameraError}</p>
-                <div className="mobile-error-actions">
-                  <button 
-                    onClick={initializeCamera}
-                    className="mobile-retry-btn"
-                  >
-                    Try Again
-                  </button>
-                  <button 
-                    onClick={closeCameraModal}
-                    className="mobile-cancel-btn"
-                  >
-                    Enter Manually
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="mobile-camera-container">
-                  <video
-                    id="mobile-camera-feed"
-                    autoPlay
-                    playsInline
-                    webkit-playsinline
-                    muted
-                    className="mobile-camera-feed"
-                  />
-                  <div className="mobile-camera-overlay">
-                    <div className="mobile-id-frame">
-                      <div className="mobile-corner tl"></div>
-                      <div className="mobile-corner tr"></div>
-                      <div className="mobile-corner bl"></div>
-                      <div className="mobile-corner br"></div>
-                    </div>
-                  </div>
-                </div>
-                <p className="terminal-camera-instruction">Position your ID within the frame above</p>
-                <button
-                  onClick={handleCaptureID}
-                  disabled={ocrLoading || !cameraStream}
-                  className="mobile-capture-btn"
-                >
-                  {ocrLoading ? (
-                    <>
-                      <span className="mobile-loading-spinner"></span>
-                      Processing... Please wait
-                    </>
-                  ) : (
-                    'Capture ID'
-                  )}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPersonalDetailsStep = () => (
-    <div className="mobile-reg-card mobile-step-transition">
-      <div className="mobile-step-header">
-        <div className="mobile-step-icon">
-          <i className="fa-regular fa-user"></i>
-        </div>
-        <h3>Personal Information</h3>
-        <p>Please provide your basic information</p>
-      </div>
-
-      <div className="mobile-input-group">
-        <label>Scan ID</label>
-        <div className="mobile-scan-helper">Optional: a shortcut to speed up typing your full name</div>
-        <div className="mobile-id-scan">
-          <img src={sampleID} alt="Sample ID" className="sampleID" />
-          <button
-            onClick={handleIDScanClick}
-            disabled={idScanMode || !isCameraAvailable()}
-            className="mobile-id-scan-btn"
-          >
-            {!isCameraAvailable() ? 'Camera Not Available (HTTPS Required)' :
-              idScanMode ? (<><span className="mobile-loading-spinner"></span>Scanning ID...</>) : "Scan ID"}
-          </button>
-        </div>
-      </div>
-
-      <div className="mobile-form-grid two-column">
-        <div className="mobile-input-group">
-          <label>Full Name</label>
-          <input
-            type="text"
-            name="fullName"
-            value={formData.fullName}
-            onChange={handleInputChange}
-            placeholder="Enter your complete name"
-            className={`mobile-reg-form-input ${fieldErrors.fullName ? 'invalid' : ''}`}
-            required
-          />
-          <small className="input-reminder">First Name, Middle Name, Last Name</small>
-          {showValidation && fieldErrors.fullName && (
-            <small className="error-text">{fieldErrors.fullName}</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Sex</label>
-          <select
-            name="sex"
-            value={formData.sex}
-            onChange={handleInputChange}
-            className={`mobile-reg-form-input ${showValidation && fieldErrors.sex ? 'invalid' : ''}`}
-            required
-          >
-            <option value="" disabled hidden>Select sex</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-          </select>
-          {showValidation && fieldErrors.sex && (
-            <small className="error-text">{fieldErrors.sex}</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Date of Birth</label>
-          <input
-            type="date"
-            name="birthday"
-            value={formData.birthday}
-            onChange={handleInputChange}
-            className={`mobile-reg-form-input ${showValidation && fieldErrors.birthday ? 'invalid' : ''}`}
-            max={new Date().toISOString().split('T')[0]}
-            required
-          />
-          {showValidation && fieldErrors.birthday && (
-            <small className="error-text">{fieldErrors.birthday}</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Age</label>
-          <input
-            type="text"
-            value={formData.age ? (typeof formData.age === 'string' && formData.age.includes('old') ? formData.age : `${formData.age} years old`) : ''}
-            className="mobile-reg-form-input"
-            disabled
-            placeholder="Auto-fill"
-          />
-        </div>
-
-        <div className="mobile-input-group full-width">
-          <label>Complete Address</label>
-          <input
-            type="text"
-            name="address"
-            value={formData.address}
-            onChange={handleInputChange}
-            placeholder="House No., Street, Barangay, City, Province"
-            className={`mobile-reg-form-input ${fieldErrors.address ? 'invalid' : ''}`}
-            required
-          />
-          {fieldErrors.address && (
-            <small className="error-text">{fieldErrors.address}</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Contact Number</label>
-          <input
-            type="tel"
-            name="contactNumber"
-            value={formData.contactNumber}
-            onChange={handleInputChange}
-            placeholder="09XX-XXX-XXXX"
-            className={`mobile-reg-form-input ${fieldErrors.contactNumber ? 'invalid' : ''}`}
-            required
-          />
-          {fieldErrors.contactNumber && (
-            <small className="error-text">{fieldErrors.contactNumber}</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Email Address</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="your.email@example.com"
-            className={`mobile-reg-form-input ${fieldErrors.email ? 'invalid' : ''}`}
-            required
-          />
-          {fieldErrors.email && (
-            <small className="error-text">{fieldErrors.email}</small>
-          )}
-        </div>  
-      </div>
-    </div>
+/**
+ * Extract student name from PLM ID format based on actual PLM ID samples
+ * @param {string[]} lines - Array of OCR text lines
+ * @returns {string|null} - Extracted PLM student name or null
+ */
+export const extractPLMName = (lines) => {
+  const isPLMID = lines.some(line => 
+    line.includes('PAMANTASAN') || 
+    line.includes('LUNGSOD') || 
+    line.includes('MAYNILA') || 
+    line.includes('PLM')
   );
-
-  const renderEmergencyContactStep = () => (
-    <div className="mobile-reg-card mobile-step-transition">
-      <div className="mobile-step-header">
-        <div className="mobile-step-icon">
-          <i className="fa-regular fa-bell"></i>
-        </div>
-        <h3>Emergency Contact</h3>
-        <p>Provide emergency contact information</p>
-      </div>
-
-      <div className="mobile-emergency-banner">
-        <div className="mobile-banner-icon">
-          <i className="fa-solid fa-bell"></i>
-        </div>
-        <div className="mobile-banner-content">
-          <h4>Important Information</h4>
-          <p>This person will be contacted in case of medical emergency</p>
-        </div>
-      </div>
-
-      <div className="mobile-form-grid">
-        <div className="mobile-input-group">
-          <label>Emergency Contact Name</label>
-          <input
-            type="text"
-            name="emergencyContactName"
-            value={formData.emergencyContactName}
-            onChange={handleInputChange}
-            placeholder="Full name of emergency contact"
-            className={`mobile-reg-form-input ${fieldErrors.emergencyContactName ? 'invalid' : ''}`}
-            required
-          />
-          {fieldErrors.emergencyContactName && (
-            <small className="error-text">{fieldErrors.emergencyContactName}</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Contact Number</label>
-          <input
-            type="tel"
-            name="emergencyContactNumber"
-            value={formData.emergencyContactNumber}
-            onChange={handleInputChange}
-            placeholder="09XX-XXX-XXXX"
-            className={`mobile-reg-form-input ${fieldErrors.emergencyContactNumber ? 'invalid' : ''}`}
-            required
-          />
-          {fieldErrors.emergencyContactNumber && (
-            <small className="error-text">{fieldErrors.emergencyContactNumber}</small>
-          )}
-          {formData.emergencyContactNumber === formData.contactNumber && (
-            <small className="error-text">Emergency contact number cannot be the same as patient's number</small>
-          )}
-        </div>
-
-        <div className="mobile-input-group">
-          <label>Relationship</label>
-          <select
-            name="emergencyRelationship"
-            value={formData.emergencyRelationship}
-            onChange={handleInputChange}
-            className={`mobile-reg-form-input ${showValidation && fieldErrors.emergencyRelationship ? 'invalid' : ''}`}
-            required
-          >
-            <option value="" disabled hidden>Select relationship</option>
-            <option value="Parent">Parent</option>
-            <option value="Spouse">Spouse/Partner</option>
-            <option value="Sibling">Sibling</option>
-            <option value="Child">Child</option>
-            <option value="Relative">Other Relative</option>
-            <option value="Friend">Close Friend</option>
-            <option value="Guardian">Legal Guardian</option>
-          </select>
-          {showValidation && fieldErrors.emergencyRelationship && (
-            <small className="error-text">{fieldErrors.emergencyRelationship}</small>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderReviewStep = () => (
-    <div className="mobile-reg-card mobile-step-transition">
-      <div className="mobile-step-header">
-        <div className="mobile-step-icon">
-          <i className="fa-regular fa-clipboard"></i>
-        </div>
-        <h3>Review & Confirm</h3>
-        <p>Please verify your information</p>
-      </div>
-
-      <div className="mobile-review-sections">
-        <div className="mobile-review-section">
-          <h4><i className="fa-solid fa-user"></i> Personal Information</h4>
-          <div className="mobile-review-grid">
-            <div className="mobile-review-item">
-              <label>Full Name:</label>
-              <span>{formData.fullName}</span>
-            </div>
-            <div className="mobile-review-item">
-              <label>Age & Sex:</label>
-              <span>{formData.age} years old, {formData.sex}</span>
-            </div>
-            <div className="mobile-review-item">
-              <label>Contact Number:</label>
-              <span>{formData.contactNumber}</span>
-            </div>
-            <div className="mobile-review-item">
-              <label>Email:</label>
-              <span>{formData.email}</span>
-            </div>
-            <div className="mobile-review-item full-width">
-              <label>Address:</label>
-              <span>{formData.address}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mobile-review-section">
-          <h4><i className="fa-solid fa-bell"></i> Emergency Contact</h4>
-          <div className="mobile-review-grid">
-            <div className="mobile-review-item">
-              <label>Name:</label>
-              <span>{formData.emergencyContactName}</span>
-            </div>
-            <div className="mobile-review-item">
-              <label>Number:</label>
-              <span>{formData.emergencyContactNumber}</span>
-            </div>
-            <div className="mobile-review-item">
-              <label>Relationship:</label>
-              <span>{formData.emergencyRelationship}</span>
-            </div>
-          </div>
-        </div>
-
-        {formData.idType && (
-          <div className="mobile-review-section">
-            <h4><i className="fa-solid fa-id-card"></i> ID Information</h4>
-            <div className="mobile-review-grid">
-              <div className="mobile-review-item">
-                <label>ID Type:</label>
-                <span>{formData.idType}</span>
-              </div>
-              <div className="mobile-review-item">
-                <label>ID Number:</label>
-                <span>{formData.idNumber}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mobile-terms">
-        <label className={`mobile-checkbox-label ${showValidation && fieldErrors.termsAccepted ? 'invalid' : ''}`}>
-          <input 
-            type="checkbox" 
-            checked={termsAccepted}
-            onChange={(e) => {
-              setTermsAccepted(e.target.checked);
-              if (e.target.checked) {
-                const newErrors = { ...fieldErrors };
-                delete newErrors.termsAccepted;
-                setFieldErrors(newErrors);
-              }
-            }}
-            className={showValidation && fieldErrors.termsAccepted ? 'invalid' : ''}
-          />
-          <span>
-            I confirm that all information provided is accurate and I agree to the
-            <strong> Terms and Conditions</strong> and <strong>Privacy Policy </strong>
-            of CliCare Hospital.
-          </span>
-        </label>
-      </div>
-    </div>
-  );
-
-  const renderNavigationButtons = () => {
-    if (currentStep === 3) {
-      return (
-        <div className="mobile-nav-buttons">
-          <button 
-            type="button" 
-            onClick={prevStep}
-            className="mobile-nav-btn secondary"
-            disabled={loading}
-          >
-            <i className="fa-solid fa-less-than"></i>Back
-          </button>
-          <button 
-            type="button"
-            onClick={nextStep}
-            disabled={loading}
-            className="mobile-nav-btn submit"
-          >
-            Continue<i className="fa-solid fa-greater-than"></i>
-          </button> 
-        </div>
-      );
+  
+  if (!isPLMID) {
+    return null;
+  }
+  
+  console.log('PLM ID detected, processing lines...');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (line.includes('PAMANTASAN') || line.includes('LUNGSOD') || 
+        line.includes('MAYNILA') || line.includes('PLM')) {
+      continue;
     }
-
-    return (
-      <div className="mobile-nav-buttons">
-        {currentStep > 1 ? (
-          <button 
-            type="button" 
-            onClick={prevStep}
-            className="mobile-nav-btn secondary"
-          >
-            <i className="fa-solid fa-less-than"></i>Back
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => window.location.href = '/mobile-patient-login'}
-            className="mobile-nav-btn home"
-          >
-            <i className="fa-solid fa-less-than"></i>Back to Home
-          </button>
-        )}
-        <button 
-          type="button"
-          onClick={nextStep}
-          className="mobile-nav-btn primary"
-        >
-          Continue<i className="fa-solid fa-greater-than"></i>
-        </button>
-      </div>
-    );
-  };
-
-  const renderProgressBar = () => (
-    <div className="mobile-progress-container">
-      <div className="mobile-progress-steps">
-        {['Personal', 'Emergency', 'Review'].map((name, index) => {
-          const stepNumber = index + 1;
-          const isActive = stepNumber === currentStep;
-          const isCompleted = stepNumber < currentStep;
-          const isLast = index === 2; // Last step (Review)
-
-          return (
-            <div key={index} className="mobile-progress-step-item">
-              <div className={`mobile-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
-                <div className="mobile-step-number">
-                  {isCompleted ? <i className="fa-solid fa-check"></i> : stepNumber}
-                </div>
-                <div className="mobile-step-label">{name}</div>
-              </div>
-              {!isLast && (
-                <div className={`mobile-step-connector ${isCompleted ? 'completed' : ''} ${stepNumber === currentStep ? 'active' : ''}`}></div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="mobile-registration-portal">
-      <div className="mobile-reg-header">
-        <div className="mobile-reg-logo">
-          <i className="fa-solid fa-hospital"></i>
-        </div>
-        <div className="mobile-reg-title">
-          <h1>CliCare</h1>
-          <p>Patient Registration System</p>
-        </div>
-        <div className="mobile-hospital-info">
-          <p><strong>{formatTime(currentTime)}</strong></p>
-          <p>{formatDate(currentTime)}</p>
-        </div>
-      </div>
-
-      {renderProgressBar()}
-      
-      <div className="mobile-reg-content">
-        {currentStep === 1 && renderPersonalDetailsStep()}
-        {currentStep === 2 && renderEmergencyContactStep()}
-        {currentStep === 3 && renderReviewStep()}
-      </div>
-
-      <div className="mobile-nav-container">
-        {renderNavigationButtons()}
-      </div>
-
-      <div className="mobile-help-footer">
-        <div className="mobile-help-section">
-          <h4>Need Help?</h4>
-          <p>Press the help button or ask hospital staff for assistance</p>
-        </div>
-      </div>
-
-      {renderCameraModal()}
-    </div>
-  );
+    
+    if (/^\d{8,10}$/.test(line.replace(/\s/g, ''))) {
+      continue;
+    }
+    
+    if (line.includes('STUDENT') || line.includes('NO:') || 
+        line.includes('VALID') || line.includes('UNTIL') ||
+        line.includes('EXPIRES') || line.includes('ISSUED')) {
+      continue;
+    }
+    
+    if (isPLMStudentName(line)) {
+      const extractedName = cleanPLMName(line);
+      console.log('PLM name found:', extractedName);
+      return extractedName;
+    }
+  }
+  
+  return null;
 };
 
-export default MobilePatientRegistration;
+/**
+ * Check if a line contains a valid PLM student name based on the samples
+ * @param {string} line - Text line to validate
+ * @returns {boolean} - True if valid PLM student name
+ */
+export const isPLMStudentName = (line) => {
+  if (!line || line.length < 10 || line.length > 50) {
+    return false;
+  }
+
+  if (!/^[A-Z\s\.]+$/.test(line)) {
+    return false;
+  }
+  
+  const words = line.split(/\s+/).filter(word => word.length > 0);
+  
+  if (words.length < 3 || words.length > 5) {
+    return false;
+  }
+  
+  const hasValidWordLengths = words.every(word => {
+    const cleanWord = word.replace('.', '');
+    return cleanWord.length >= 1 && cleanWord.length <= 12;
+  });
+  
+  const substantialWords = words.filter(word => word.replace('.', '').length > 2);
+  
+  const institutionalTerms = ['UNIVERSITY', 'COLLEGE', 'DEPARTMENT', 'BACHELOR', 
+                             'MASTER', 'DEGREE', 'PROGRAM', 'COURSE', 'YEAR',
+                             'SEMESTER', 'SECTION', 'MANILA', 'CITY'];
+  
+  const hasInstitutionalTerms = words.some(word => 
+    institutionalTerms.some(term => word.includes(term))
+  );
+  
+  return hasValidWordLengths && substantialWords.length >= 2 && !hasInstitutionalTerms;
+};
+
+/**
+ * Clean and format the PLM student name
+ * @param {string} nameString - Raw name string from OCR
+ * @returns {string|null} - Cleaned PLM name
+ */
+export const cleanPLMName = (nameString) => {
+  if (!nameString) return null;
+  
+  return nameString.trim()
+    .replace(/\s+/g, ' ')           // Normalize spaces
+    .replace(/\s*\.\s*/g, '. ')     // Standardize period spacing
+    .replace(/\.\s*$/, '');         // Remove trailing period if any
+};
+
+/**
+ * Extract name from Philippine Government ID format
+ * @param {string[]} lines - Array of OCR text lines
+ * @returns {string|null} - Extracted government ID name or null
+ */
+export const extractGovernmentIDName = (lines) => {
+  const namePattern = /([A-Z\s]+),\s*([A-Z\s]+)/;
+  
+  for (let line of lines) {
+    // Skip government ID headers
+    if (line.includes('REPUBLIC') || line.includes('PHILIPPINES') || 
+        line.includes('DEPARTMENT') || line.includes('TRANSPORTATION') ||
+        line.includes('DRIVER') || line.includes('LICENSE')) {
+      continue;
+    }
+    
+    // Look for comma-separated name format (Last, First Middle)
+    const nameMatch = line.match(namePattern);
+    if (nameMatch) {
+      const lastName = nameMatch[1].trim();
+      const firstMiddle = nameMatch[2].trim();
+      return `${firstMiddle} ${lastName}`;
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Extract name using generic patterns (fallback method)
+ * @param {string[]} lines - Array of OCR text lines
+ * @returns {string|null} - Extracted generic name or null
+ */
+export const extractGenericName = (lines) => {
+  for (let line of lines) {
+    if (line.length > 8 && line.length < 60 && 
+        /^[A-Z\s\.]+$/.test(line) && 
+        !line.includes('MALE') && !line.includes('FEMALE') &&
+        !line.includes('PHL') && !line.includes('NCR') &&
+        !line.includes('PAMANTASAN') && !line.includes('LUNGSOD') &&
+        !line.includes('REPUBLIC') && !line.includes('PHILIPPINES')) {
+      
+      const words = line.split(/\s+/).filter(word => word.length > 1);
+      if (words.length >= 2 && words.length <= 5) {
+        return line.trim();
+      }
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Utility function to check if camera is available
+ * @returns {boolean} - True if camera API is available
+ */
+export const isCameraAvailable = () => {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+};
+
+/**
+ * Initialize camera stream for ID scanning
+ * @returns {Promise<MediaStream>} - Camera stream
+ */
+export const initializeCamera = async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('Camera API not supported in this browser or requires HTTPS');
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        facingMode: 'environment', // Use back camera on mobile
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    });
+    
+    return stream;
+  } catch (err) {
+    let errorMessage = '';
+    
+    if (err.name === 'NotAllowedError') {
+      errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+    } else if (err.name === 'NotFoundError') {
+      errorMessage = 'No camera found on this device.';
+    } else if (err.name === 'NotSupportedError') {
+      errorMessage = 'Camera not supported on this device or browser.';
+    } else {
+      errorMessage = 'Camera access failed. Please try again or enter information manually.';
+    }
+    
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Cleanup camera stream
+ * @param {MediaStream} stream - Camera stream to cleanup
+ */
+export const cleanupCamera = (stream) => {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+};
+
+/**
+ * Capture image from video element
+ * @param {HTMLVideoElement} videoElement - Video element to capture from
+ * @returns {string} - Base64 image data
+ */
+export const captureImageFromVideo = (videoElement) => {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  canvas.width = videoElement.videoWidth;
+  canvas.height = videoElement.videoHeight;
+  context.drawImage(videoElement, 0, 0);
+  
+  return canvas.toDataURL('image/jpeg', 0.8);
+};
+
+export default {
+  processIDWithOCR,
+  extractNameFromID,
+  extractPLMName,
+  isPLMStudentName,
+  cleanPLMName,
+  isCameraAvailable,
+  initializeCamera,
+  cleanupCamera,
+  captureImageFromVideo
+};
