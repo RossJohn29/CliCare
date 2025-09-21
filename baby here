@@ -1,634 +1,1143 @@
-/* terminalpatientlogin.css */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-@import '@fortawesome/fontawesome-free/css/all.css';
-
-/* Base Layout */
-.terminal-patient-portal {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #4285f4 0%, #1a73e8 50%, #1557b0 100%);
-  font-family: 'Poppins', sans-serif;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-
-.terminal-patient-portal::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="terminal-dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="0.8" fill="rgba(255,255,255,0.06)"/></pattern></defs><rect width="100" height="100" fill="url(%23terminal-dots)"/></svg>');
-  pointer-events: none;
-}
-
-/* Header */
-.terminal-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(15px);
-  padding: 15px 25px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(66, 133, 244, 0.2);
-  position: relative;
-  z-index: 10;
-  min-height: 60px;
-}
-
-.terminal-logo {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #4285f4, #1a73e8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.3em;
-  font-weight: 600;
-  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
-}
-
-.terminal-title {
-  flex: 1;
-  text-align: center;
-}
-
-.terminal-title h1 {
-  color: #1557b0;
-  font-size: 1.8em;
-  margin: 0;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-
-.terminal-title p {
-  color: #5f6368;
-  font-size: 0.85em;
-  margin: 3px 0 0 0;
-  font-weight: 500;
-}
-
-.terminal-hospital-info {
-  text-align: right;
-  color: #5f6368;
-}
-
-.terminal-hospital-info p {
-  margin: 0;
-  font-size: 0.8em;
-  font-weight: 500;
-}
-
-.terminal-hospital-info strong {
-  color: #202124;
-  font-weight: 600;
-}
-
-/* Main Content */
-.terminal-content {
-  flex: 1;
-  padding: 20px;
-  position: relative;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.terminal-card {
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
-  border-radius: 20px;
-  padding: 40px 35px;
-  width: 100%;
-  max-width: 500px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  position: relative;
-}
-
-/* Form Headers */
-.terminal-form-header {
-  text-align: center;
-  margin-bottom: 25px;
-  position: relative;
-}
-
-.terminal-patient-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-}
-
-.terminal-indicator {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
-  border: 3px solid #4285f4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-}
-
-.terminal-indicator .fa-regular.fa-user,
-.terminal-indicator .fa-regular.fa-hospital,
-.terminal-indicator .fa-solid.fa-user-plus {
-  color: #4285f4;
-}
-
-.terminal-form-header h3 {
-  color: #202124;
-  font-size: 1.6em;
-  margin: 0 0 5px 0;
-  font-weight: 600;
-}
-
-.terminal-form-header p {
-  color: #5f6368;
-  font-size: 0.9em;
-  margin: 0;
-  font-weight: 400;
-}
-
-/* Welcome Section */
-.terminal-welcome {
-  text-align: center;
-  margin-bottom: 25px;
-}
-
-.terminal-welcome h2 {
-  color: #202124;
-  font-size: 1.6em;
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.terminal-welcome p {
-  color: #5f6368;
-  font-size: 0.9em;
-  margin: 0 0 20px 0;
-  font-weight: 500;
-}
-
-.terminal-time-display {
-  background: linear-gradient(145deg, #e8f0fe, #d2e3fc);
-  border-radius: 12px;
-  padding: 15px;
-  border: 2px solid #4285f4;
-  display: inline-block;
-}
-
-.terminal-time {
-  font-size: 1.4em;
-  font-weight: 800;
-  color: #1557b0;
-  margin-bottom: 3px;
-}
-
-.terminal-date {
-  font-size: 0.75em;
-  color: #4285f4;
-  font-weight: 600;
-}
-
-/* Patient Type Selection */
-.terminal-patient-types {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 24px;
-}
-
-.terminal-patient-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  background: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-align: left;
-  width: 100%;
-  font-family: 'Poppins', sans-serif;
-}
-
-.terminal-patient-btn:hover {
-  border-color: #3b82f6;
-  background: #f8fafc;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-}
-
-.terminal-patient-btn .icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 100%;
-  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4285f4;
-  font-size: 20px;
-  flex-shrink: 0;
-}
-
-.terminal-btn-content {
-  flex: 1;
-  margin: 0 16px;
-}
-
-.terminal-btn-content h3 {
-  margin: 0 0 1px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.terminal-btn-content p {
-  font-size: 13px;
-  color: #4285f4;
-  font-weight: 500;
-  margin: 0;
-}
-
-.terminal-btn-content small {
-  font-size: 11px;
-  color: #1f2937;
-  line-height: 1;
-}
-
-.terminal-arrow {
-  font-size: 20px;
-  color: #6b7280;
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.terminal-patient-btn:hover .terminal-arrow {
-  color: #3b82f6;
-  transform: translateX(4px);
-}
-
-/* Forms */
-.terminal-login-form {
-  text-align: left;
-}
-
-.terminal-input-group {
-  margin-bottom: 20px;
-}
-
-.terminal-input-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #202124;
-  font-weight: 600;
-  font-size: 0.9em;
-}
-
-.terminal-form-input {
-  width: 100%;
-  padding: 14px 16px;
-  border: 2px solid #dadce0;
-  border-radius: 12px;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  background: #ffffff;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 400;
-  box-sizing: border-box;
-}
-
-.terminal-form-input:focus {
-  outline: none;
-  border-color: #4285f4;
-  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
-}
-
-.terminal-form-input:disabled {
-  background: #f8f9fa;
-  color: #80868b;
-  cursor: not-allowed;
-  border-color: #e8eaed;
-}
-
-.terminal-form-input.invalid {
-  border-color: #ea4335;
-  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.1);
-}
-
-.terminal-form-input.invalid:focus {
-  border-color: #ea4335;
-  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.1);
-}
-
-.terminal-input-hint {
-  display: block;
-  color: #5f6368;
-  font-size: 0.8em;
-  margin-top: 5px;
-  font-weight: 400;
-}
-
-.terminal-input-hint .fa-solid.fa-square-check {
-  color: #28a745;
-}
-
-.terminal-input-hint .fa-solid.fa-triangle-exclamation {
-  color: #FFC107;
-}
-
-/* Method Selection */
-.terminal-method-selection {
-  margin-bottom: 20px;
-}
-
-.terminal-method-toggle {
-  display: flex;
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 3px;
-  margin-bottom: 12px;
-  border: 1px solid #e8eaed;
-}
-
-.terminal-method-btn {
-  flex: 1;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  background: transparent;
-  color: #5f6368;
-  font-family: 'Poppins', sans-serif;
-  transition: all 0.3s ease;
-}
-
-.terminal-method-btn.active {
-  background: white;
-  color: #4285f4;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-}
-
-.terminal-method-btn .fa-solid.fa-envelope,
-.terminal-method-btn .fa-solid.fa-phone {
-  margin-right: 5px;
-}
-
-.terminal-contact-group {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-}
-
-.terminal-contact-group .terminal-form-input {
-  flex: 1;
-}
-
-/* Registration Info */
-.terminal-reg-info {
-  margin: 25px 0;
-}
-
-.terminal-info-card {
-  background: linear-gradient(145deg, #e8f0fe 0%, #d2e3fc 100%);
-  border: 2px solid #4285f4;
-  border-radius: 12px;
-  padding: 18px;
-  margin-bottom: 15px;
-}
-
-.terminal-info-card h4 {
-  color: #1557b0;
-  margin-bottom: 12px;
-  font-size: 1em;
-  font-weight: 600;
-}
-
-.terminal-info-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.terminal-info-list li {
-  color: #202124;
-  margin: 8px 0;
-  line-height: 1.4;
-  font-size: 0.85em;
-  font-weight: 400;
-}
-
-.terminal-info-list i {
-  color: #28a745;
-  margin-right: 10px;
-}
-
-/* Buttons */
-.terminal-access-btn,
-.terminal-otp-send-btn {
-  background: linear-gradient(145deg, #4285f4 0%, #1a73e8 100%);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Poppins', sans-serif;
-  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
-.terminal-access-btn {
-  width: 100%;
-  padding: 16px;
-  font-size: 15px;
-  margin-bottom: 25px;
-}
-
-.terminal-otp-send-btn {
-  padding: 14px 18px;
-  font-size: 13px;
-  flex-shrink: 0;
-  min-width: 100px;
-}
-
-.terminal-access-btn:hover:not(:disabled),
-.terminal-otp-send-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
-}
-
-.terminal-access-btn:disabled,
-.terminal-otp-send-btn:disabled {
-  background: #a6c4fa;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.terminal-account-toggle {
-  text-align: center;
-  margin-top: 20px;
-}
-
-.terminal-account-toggle p {
-  color: #5f6368;
-  font-size: 0.9em;
-  margin-bottom: 0;
-}
-
-.terminal-account-link {
-  background: none;
-  border: none;
-  color: #4285f4;
-  cursor: pointer;
-  font-size: 0.9em;
-  font-weight: 600;
-  text-decoration: underline;
-  font-family: 'Poppins', sans-serif;
-}
-
-.terminal-account-link:hover {
-  text-decoration: none;
-  color: #1a73e8;
-}
-
-/* Loading & Error States */
-.terminal-loading-spinner {
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  width: 12px;
-  height: 12px;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
-
-.terminal-error {
-  background: linear-gradient(145deg, #fce8e6 0%, #fad2cf 100%);
-  color: #d93025;
-  padding: 12px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  border: 2px solid #ea4335;
-  font-weight: 500;
-  text-align: center;
-  font-family: 'Poppins', sans-serif;
-  font-size: 0.9em;
-}
-
-.error-text {
-  display: block;
-  color: #ea4335;
-  font-size: 0.8em;
-  margin-top: 5px;
-  font-weight: 500;
-  font-family: 'Poppins', sans-serif;
-}
-
-/* Footer */
-.terminal-footer {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(15px);
-  padding: 15px 25px;
-  border-top: 1px solid rgba(66, 133, 244, 0.2);
-  position: relative;
-  z-index: 10;
-  text-align: center;
-}
-
-.terminal-footer p {
-  color: #5f6368;
-  font-size: 0.8em;
-  margin: 0;
-  font-weight: 400;
-}
-
-.terminal-help-footer {
-  text-align: center;
-  margin-top: 20px;
-}
-
-.terminal-help-footer p {
-  color: #5f6368;
-  font-size: 0.8em;
-  margin: 0;
-  font-weight: 500;
-}
-
-/* Animations */
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .terminal-content {
-    padding: 15px;
-  }
+// mobilepatientregistration.js - Aligned with Terminal Design
+import React, { useState, useEffect } from 'react';
+import './mobilepatientregistration.css';
+import sampleID from "../../sampleID.png";
+import Tesseract from 'tesseract.js';
+
+const MobilePatientRegistration = () => {
+  const [formData, setFormData] = useState({
+    fullName: '',
+    sex: '',
+    birthday: '',
+    age: '',
+    address: '',
+    contactNumber: '',
+    email: '',
+    
+    // Emergency Contact
+    emergencyContactName: '',
+    emergencyContactNumber: '',
+    emergencyRelationship: '',
+    
+    // Optional ID Scan
+    idType: '',
+    idNumber: ''
+  });
   
-  .terminal-card {
-    max-width: 90%;
-    padding: 35px 30px;
-  }
-}
+  const [currentStep, setCurrentStep] = useState(1); // 1: Personal, 2: Emergency, 3: Review
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [idScanMode, setIdScanMode] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showValidation, setShowValidation] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-@media (max-width: 480px) {
-  .terminal-header {
-    padding: 12px 15px;
-  }
+  // Auto-scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [currentStep]);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    let processedValue = value;
+
+    if (['fullName', 'emergencyContactName', 'address'].includes(name)) {
+      processedValue = toTitleCase(value);
+    } else if (name === 'email') {
+      processedValue = value.toLowerCase();
+    } else if (['contactNumber', 'emergencyContactNumber'].includes(name)) {
+      processedValue = formatPhoneNumber(value);
+    }
+
+    setFormData(prev => {
+      const updated = { ...prev, [name]: processedValue };
   
-  .terminal-logo {
-    width: 45px;
-    height: 45px;
-    font-size: 1.2em;
-  }
-  
-  .terminal-title h1 {
-    font-size: 1.6em;
-  }
-  
-  .terminal-content {
-    padding: 10px;
-  }
-  
-  .terminal-card {
-    max-width: 95%;
-    padding: 30px 25px;
-    border-radius: 16px;
-  }
-  
-  .terminal-patient-btn {
-    padding: 15px 12px;
-    min-height: 70px;
-  }
-  
-  .terminal-patient-btn .icon {
-    width: 45px;
-    height: 45px;
-    font-size: 1.8em;
-    margin-right: 12px;
-  }
-  
-  .terminal-contact-group {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .terminal-otp-send-btn {
-    width: 100%;
-    min-width: auto;
-  }
-}
+      if (name === 'birthday') {
+        updated.age = calculateAge(processedValue);
+      }
+      
+      return updated;
+    });
+
+    setError('');
+
+    if (showValidation) {
+      setShowValidation(false);
+      setFieldErrors({});
+    }
+  };
+
+  const toTitleCase = (str) => {
+    if (!str) return '';
+    return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatPhoneNumber = (value) => {
+    const cleaned = value.replace(/\D/g, '');
+    const limited = cleaned.slice(0, 11);
+
+    if (limited.length >= 8) {
+      return limited.replace(/(\d{4})(\d{3})(\d{4})/, '$1-$2-$3');
+    } else if (limited.length >= 5) {
+      return limited.replace(/(\d{4})(\d{1,3})/, '$1-$2');
+    }
+    return limited;
+  };
+
+  const cleanPhoneNumber = (value) => {
+    return value.replace(/\D/g, '');
+  };
+
+  const validatePhoneNumber = (value) => {
+    const cleaned = value.replace(/\D/g, '');
+    
+    if (!cleaned) return 'Contact number is required';
+    if (cleaned.length < 11) return 'Contact number must be 11 digits';
+    if (cleaned.length > 11) return 'Contact number must be exactly 11 digits';
+    if (!cleaned.startsWith('09')) return 'Contact number must start with 09';
+    
+    return null;
+  };
+
+  const validateEmail = (email) => {
+    if (!email) return 'Email address is required';
+    if (!email.includes('@')) return 'Email must contain @';
+    if (!email.match(/\.[a-zA-Z]{2,}$/)) return 'Email must contain a valid domain (e.g., .com, .org)';
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.toLowerCase())) return 'Please enter a valid email format';
+    
+    return null;
+  };
+
+  const validateFullName = (name) => {
+    if (!name.trim()) return 'Full name is required';
+    const words = name.trim().split(/\s+/);
+    if (words.length < 2) return 'Please enter your full name';
+    if (/\./.test(name)) return 'Do not use initials (write full middle name instead)';
+    return null;
+  };
+
+  const validateAddress = (address) => {
+    if (!address.trim()) return 'Complete address is required';
+    const parts = address.split(' ').map(p => p.trim()).filter(Boolean);
+    if (parts.length < 4) {
+      return 'Please follow the format: House No., Street, Barangay, City, Province';
+    }
+    return null;
+  };
+
+  const checkCameraPermissions = async () => {
+    try {
+      const permissions = await navigator.permissions.query({ name: 'camera' });
+      
+      if (permissions.state === 'denied') {
+        setCameraError('Camera access is blocked. Please enable camera permissions in your browser settings and refresh the page.');
+        return false;
+      }
+      
+      return true;
+    } catch (err) {
+      return true;
+    }
+  };
+
+  const handleIDScanClick = () => {
+    setShowCameraModal(true);
+    setCameraError('');
+  };
+
+  useEffect(() => {
+    if (showCameraModal) {
+      initializeCamera();
+    } else {
+      cleanupCamera();
+    }
+    
+    return () => cleanupCamera();
+  }, [showCameraModal]);
+
+  const initializeCamera = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported in this browser or requires HTTPS');
+      }
+
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920, min: 640, max: 1920 },
+          height: { ideal: 1080, min: 480, max: 1080 }
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setCameraStream(stream);
+      
+      setTimeout(() => {
+        const videoElement = document.getElementById('mobile-camera-feed');
+        if (videoElement) {
+          videoElement.srcObject = stream;
+          videoElement.setAttribute('playsinline', '');
+          videoElement.setAttribute('webkit-playsinline', '');
+          videoElement.muted = true;
+          
+          const playPromise = videoElement.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.log('Video play failed:', error);
+            });
+          }
+        }
+      }, 100);
+    } catch (err) {
+      console.error('Camera access error:', err);
+      
+      let errorMessage = '';
+      
+      if (err.message.includes('Camera API not supported')) {
+        errorMessage = 'Camera scanning requires HTTPS connection. Please access this page using https:// or use a modern browser.';
+      } else if (err.name === 'NotAllowedError') {
+        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = 'No camera found on this device.';
+      } else if (err.name === 'NotSupportedError') {
+        errorMessage = 'Camera not supported on this device or browser.';
+      } else {
+        errorMessage = 'Camera access failed. Please try again or enter information manually.';
+      }
+      
+      setCameraError(errorMessage);
+    }
+  };
+
+  const isCameraAvailable = () => {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  };
+
+  const cleanupCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+  };
+
+  const handleCaptureID = () => {
+    const videoElement = document.getElementById('mobile-camera-feed');
+    
+    if (!videoElement || !videoElement.srcObject) {
+      setCameraError('Camera not ready. Please wait and try again.');
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = videoElement.videoWidth || 1280;
+    canvas.height = videoElement.videoHeight || 720;
+    
+    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    
+    const capturedImageData = canvas.toDataURL('image/jpeg', 0.9);
+    setCapturedImage(capturedImageData);
+    
+    processIDWithOCR(capturedImageData);
+  };
+
+  const processIDWithOCR = async (imageData) => {
+    setOcrLoading(true);
+    setIdScanMode(true);
+    
+    try {
+      const { data: { text } } = await Tesseract.recognize(imageData, 'eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        },
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1',
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz,0123456789',
+      });
+      
+      console.log('OCR Result:', text);
+      
+      const extractedName = extractNameFromID(text);
+      
+      if (extractedName) {
+        if (navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]);
+        }
+        
+        setFormData(prev => ({
+          ...prev,
+          fullName: extractedName
+        }));
+        
+        setShowCameraModal(false);
+        setError('');
+        
+        alert('ID scanned successfully! Name has been filled in the form.');
+        
+      } else {
+        setCameraError('Could not read the name from your ID. Please ensure the ID is well-lit and try again, or enter your name manually.');
+      }
+      
+    } catch (err) {
+      console.error('OCR processing error:', err);
+      setCameraError('Failed to process the ID image. Please ensure good lighting and try again.');
+    } finally {
+      setOcrLoading(false);
+      setIdScanMode(false);
+    }
+  };
+
+  const extractNameFromID = (text) => {
+    const lines = text.split('\n').map(line => line.trim().toUpperCase());
+    
+    const namePattern = /([A-Z\s]+),\s*([A-Z\s]+)/;
+    
+    for (let line of lines) {
+      if (line.includes('REPUBLIC') || line.includes('PHILIPPINES') || 
+          line.includes('DEPARTMENT') || line.includes('TRANSPORTATION') ||
+          line.includes('DRIVER') || line.includes('LICENSE')) {
+        continue;
+      }
+      
+      const nameMatch = line.match(namePattern);
+      if (nameMatch) {
+        const lastName = nameMatch[1].trim();
+        const firstMiddle = nameMatch[2].trim();
+        return `${firstMiddle} ${lastName}`;
+      }
+      
+      if (line.length > 10 && line.length < 50 && 
+          /^[A-Z\s]+$/.test(line) && 
+          !line.includes('MALE') && !line.includes('FEMALE') &&
+          !line.includes('PHL') && !line.includes('NCR')) {
+        
+        const words = line.split(/\s+/).filter(word => word.length > 1);
+        if (words.length >= 2 && words.length <= 4) {
+          return line;
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  const closeCameraModal = () => {
+    setShowCameraModal(false);
+    setCapturedImage(null);
+    setCameraError('');
+  };
+
+  const validateStep = (step) => {
+    switch (step) {
+      case 1:
+        return (
+          validateFullName(formData.fullName) === null &&
+          formData.sex &&
+          formData.birthday &&
+          validateAddress(formData.address) === null &&
+          validatePhoneNumber(formData.contactNumber) === null &&
+          validateEmail(formData.email) === null
+        );
+      case 2:
+        return (
+          validateFullName(formData.emergencyContactName) === null &&
+          validatePhoneNumber(formData.emergencyContactNumber) === null &&
+          formData.emergencyRelationship &&
+          formData.emergencyContactNumber !== formData.contactNumber
+        );
+      case 3:
+        return (
+          formData.fullName &&
+          formData.sex &&
+          formData.birthday &&
+          formData.address &&
+          formData.contactNumber &&
+          formData.email &&
+          formData.emergencyContactName &&
+          formData.emergencyContactNumber &&
+          formData.emergencyRelationship &&
+          termsAccepted
+        );
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    const stepErrors = {};
+
+    if (currentStep === 1) {
+      if (!formData.fullName.trim()) {
+        stepErrors.fullName = 'Full name is required';
+      } else if (validateFullName(formData.fullName)) {
+        stepErrors.fullName = validateFullName(formData.fullName);
+      }
+
+      if (!formData.sex) stepErrors.sex = 'Select your sex';
+
+      if (!formData.birthday) {
+        stepErrors.birthday = 'Select your date of birth';
+      } else if (validateAge(formData.birthday)) {
+        stepErrors.birthday = validateAge(formData.birthday);
+      }
+
+      if (!formData.address.trim()) {
+        stepErrors.address = 'Complete address is required';
+      } else if (validateAddress(formData.address)) {
+        stepErrors.address = validateAddress(formData.address);
+      }
+
+      if (!formData.contactNumber) {
+        stepErrors.contactNumber = 'Contact number is required';
+      } else if (validatePhoneNumber(formData.contactNumber)) {
+        stepErrors.contactNumber = validatePhoneNumber(formData.contactNumber);
+      }
+
+      if (!formData.email) {
+        stepErrors.email = 'Email address is required';
+      } else if (validateEmail(formData.email)) {
+        stepErrors.email = validateEmail(formData.email);
+      }
+    }
+
+    if (currentStep === 2) {
+      // Emergency contact name validation
+      if (!formData.emergencyContactName.trim()) {
+        stepErrors.emergencyContactName = 'Emergency contact name is required';
+      } else if (validateFullName(formData.emergencyContactName)) {
+        stepErrors.emergencyContactName = validateFullName(formData.emergencyContactName);
+      }
+
+      // Emergency contact number validation
+      if (!formData.emergencyContactNumber) {
+        stepErrors.emergencyContactNumber = 'Emergency contact number is required';
+      } else if (validatePhoneNumber(formData.emergencyContactNumber)) {
+        stepErrors.emergencyContactNumber = validatePhoneNumber(formData.emergencyContactNumber);
+      }
+
+      // Relationship validation
+      if (!formData.emergencyRelationship) {
+        stepErrors.emergencyRelationship = 'Select your relationship';
+      }
+
+      // Same number validation
+      if (formData.emergencyContactNumber === formData.contactNumber) {
+        stepErrors.emergencyContactNumber = 'Emergency contact number cannot be the same as patient\'s number';
+      }
+    }
+
+    if (currentStep === 3 && !termsAccepted) {
+      stepErrors.termsAccepted = 'Please accept the terms and conditions';
+    }
+
+    setFieldErrors(stepErrors);
+    setShowValidation(true);
+
+    if (Object.keys(stepErrors).length === 0) {
+      if (currentStep < 3) {
+        setCurrentStep(currentStep + 1);
+        setShowValidation(false);
+        setError('');
+      }
+    } else {
+      setError('Please complete all required fields before continuing.');
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+    setError('');
+  };
+
+  const generatePatientId = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    return `PAT${timestamp}`;
+  };
+
+  const handleSubmit = async () => {
+    if (!termsAccepted) {
+      setError('Please accept the terms and conditions');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Calculate age from birthday if not already set
+      const calculatedAge = formData.age || calculateAge(formData.birthday);
+
+      // Prepare registration data according to database schema
+      const registrationData = {
+        name: formData.fullName,
+        birthday: formData.birthday,
+        age: parseInt(calculatedAge),
+        sex: formData.sex,
+        address: formData.address,
+        contact_no: cleanPhoneNumber(formData.contactNumber),
+        email: formData.email.toLowerCase(),
+        emergency_contact_name: formData.emergencyContactName,
+        emergency_contact_relationship: formData.emergencyRelationship,
+        emergency_contact_no: cleanPhoneNumber(formData.emergencyContactNumber),
+        preferred_time: new Date().toISOString(),
+        created_date: new Date().toISOString().split('T')[0],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+      };
+
+      console.log('Submitting registration data:', registrationData);
+
+      // Submit to backend API
+      const response = await fetch('http://localhost:5000/api/temp-registration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(registrationData)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed');
+      }
+
+      console.log('Registration successful:', result);
+
+      // Store registration info in session
+      const tempRegId = result.temp_id;
+      const tempPatientId = result.temp_patient_id;
+
+      sessionStorage.setItem('tempRegId', tempRegId);
+      sessionStorage.setItem('tempPatientId', tempPatientId);
+      sessionStorage.setItem('patientName', formData.fullName);
+      sessionStorage.setItem('patientEmail', formData.email);
+      sessionStorage.setItem('registrationSuccess', 'true');
+
+      // Proceed to health assessment
+      window.location.href = '/mobile-health-assessment';
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed. Please check your internet connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateAge = (birthday) => {
+    if (!birthday) return '';
+    const today = new Date();
+    const birthDate = new Date(birthday);
+    
+    // Check if birth date is in the future
+    if (birthDate > today) return '';
+    
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    let days = today.getDate() - birthDate.getDate();
+    
+    // Adjust for negative months or days
+    if (days < 0) {
+      months--;
+      const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += lastMonth.getDate();
+    }
+    
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
+    // Validate maximum age
+    if (years > 120) return 'invalid';
+    
+    // Return age format
+    if (years === 0 && months === 0) {
+      return days === 1 ? '1 day old' : `${days} days old`;
+    } else if (years === 0) {
+      return months === 1 ? '1 month old' : `${months} months old`;
+    } else {
+      return years;
+    }
+  };
+
+// Add age validation function
+const validateAge = (birthday) => {
+  if (!birthday) return 'Date of birth is required';
+  const age = calculateAge(birthday);
+  if (age === 'invalid') return 'Enter a valid date of birth';
+  if (age === '') return 'Date of birth is invalid';
+  return null;
+};
+
+  const renderCameraModal = () => {
+    if (!showCameraModal) return null;
+    
+    return (
+      <div className="mobile-modal-overlay" onClick={(e) => e.target === e.currentTarget && closeCameraModal()}>
+        <div className="mobile-modal mobile-camera-modal">
+          <div className="mobile-modal-header">
+            <h3>Scan Philippine ID</h3>
+            <button 
+              onClick={closeCameraModal}
+              className="mobile-modal-close"
+            >
+              ×
+            </button>
+          </div>
+          
+          <div className="mobile-modal-content">
+            {cameraError ? (
+              <div className="mobile-camera-error">
+                <div className="mobile-error-icon">⚠️</div>
+                <p>{cameraError}</p>
+                <div className="mobile-error-actions">
+                  <button 
+                    onClick={initializeCamera}
+                    className="mobile-retry-btn"
+                  >
+                    Try Again
+                  </button>
+                  <button 
+                    onClick={closeCameraModal}
+                    className="mobile-cancel-btn"
+                  >
+                    Enter Manually
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mobile-camera-container">
+                  <video
+                    id="mobile-camera-feed"
+                    autoPlay
+                    playsInline
+                    webkit-playsinline
+                    muted
+                    className="mobile-camera-feed"
+                  />
+                  <div className="mobile-camera-overlay">
+                    <div className="mobile-id-frame">
+                      <div className="mobile-frame-text">Position ID here</div>
+                      <div className="mobile-corner tl"></div>
+                      <div className="mobile-corner tr"></div>
+                      <div className="mobile-corner bl"></div>
+                      <div className="mobile-corner br"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mobile-camera-instructions">
+                  <p><strong>Tips for best results:</strong></p>
+                  <ul>
+                    <li>Ensure good lighting</li>
+                    <li>Hold phone steady</li>
+                    <li>Keep ID flat and within frame</li>
+                    <li>Avoid glare and shadows</li>
+                  </ul>
+                </div>
+                
+                <button
+                  onClick={handleCaptureID}
+                  disabled={ocrLoading || !cameraStream}
+                  className="mobile-capture-btn"
+                >
+                  {ocrLoading ? (
+                    <>
+                      <span className="mobile-loading-spinner"></span>
+                      Processing... Please wait
+                    </>
+                  ) : (
+                    'Capture ID'
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPersonalDetailsStep = () => (
+    <div className="mobile-reg-card mobile-step-transition">
+      <div className="mobile-step-header">
+        <div className="mobile-step-icon">
+          <i className="fa-regular fa-user"></i>
+        </div>
+        <h3>Personal Information</h3>
+        <p>Please provide your basic information</p>
+      </div>
+
+      <div className="mobile-input-group">
+        <label>Scan ID</label>
+        <div className="mobile-scan-helper">Optional: a shortcut to speed up typing your full name</div>
+        <div className="mobile-id-scan">
+          <img src={sampleID} alt="Sample ID" className="sampleID" />
+          <button
+            onClick={handleIDScanClick}
+            disabled={idScanMode || !isCameraAvailable()}
+            className="mobile-id-scan-btn"
+          >
+            {!isCameraAvailable() ? 'Camera Not Available (HTTPS Required)' :
+              idScanMode ? (<><span className="mobile-loading-spinner"></span>Scanning ID...</>) : "Scan ID"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mobile-form-grid two-column">
+        <div className="mobile-input-group">
+          <label>Full Name</label>
+          <input
+            type="text"
+            name="fullName"
+            value={formData.fullName}
+            onChange={handleInputChange}
+            placeholder="Enter your complete name"
+            className={`mobile-reg-form-input ${fieldErrors.fullName ? 'invalid' : ''}`}
+            required
+          />
+          <small className="input-reminder">First Name, Middle Name, Last Name</small>
+          {showValidation && fieldErrors.fullName && (
+            <small className="error-text">{fieldErrors.fullName}</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Sex</label>
+          <select
+            name="sex"
+            value={formData.sex}
+            onChange={handleInputChange}
+            className={`mobile-reg-form-input ${showValidation && fieldErrors.sex ? 'invalid' : ''}`}
+            required
+          >
+            <option value="" disabled hidden>Select sex</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          {showValidation && fieldErrors.sex && (
+            <small className="error-text">{fieldErrors.sex}</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Date of Birth</label>
+          <input
+            type="date"
+            name="birthday"
+            value={formData.birthday}
+            onChange={handleInputChange}
+            className={`mobile-reg-form-input ${showValidation && fieldErrors.birthday ? 'invalid' : ''}`}
+            max={new Date().toISOString().split('T')[0]}
+            required
+          />
+          {showValidation && fieldErrors.birthday && (
+            <small className="error-text">{fieldErrors.birthday}</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Age</label>
+          <input
+            type="text"
+            value={formData.age ? (typeof formData.age === 'string' && formData.age.includes('old') ? formData.age : `${formData.age} years old`) : ''}
+            className="mobile-reg-form-input"
+            disabled
+            placeholder="Auto-fill"
+          />
+        </div>
+
+        <div className="mobile-input-group full-width">
+          <label>Complete Address</label>
+          <input
+            type="text"
+            name="address"
+            value={formData.address}
+            onChange={handleInputChange}
+            placeholder="House No., Street, Barangay, City, Province"
+            className={`mobile-reg-form-input ${fieldErrors.address ? 'invalid' : ''}`}
+            required
+          />
+          {fieldErrors.address && (
+            <small className="error-text">{fieldErrors.address}</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Contact Number</label>
+          <input
+            type="tel"
+            name="contactNumber"
+            value={formData.contactNumber}
+            onChange={handleInputChange}
+            placeholder="09XX-XXX-XXXX"
+            className={`mobile-reg-form-input ${fieldErrors.contactNumber ? 'invalid' : ''}`}
+            required
+          />
+          {fieldErrors.contactNumber && (
+            <small className="error-text">{fieldErrors.contactNumber}</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Email Address</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="your.email@example.com"
+            className={`mobile-reg-form-input ${fieldErrors.email ? 'invalid' : ''}`}
+            required
+          />
+          {fieldErrors.email && (
+            <small className="error-text">{fieldErrors.email}</small>
+          )}
+        </div>  
+      </div>
+    </div>
+  );
+
+  const renderEmergencyContactStep = () => (
+    <div className="mobile-reg-card mobile-step-transition">
+      <div className="mobile-step-header">
+        <div className="mobile-step-icon">
+          <i className="fa-regular fa-bell"></i>
+        </div>
+        <h3>Emergency Contact</h3>
+        <p>Provide emergency contact information</p>
+      </div>
+
+      <div className="mobile-emergency-banner">
+        <div className="mobile-banner-icon">
+          <i className="fa-solid fa-bell"></i>
+        </div>
+        <div className="mobile-banner-content">
+          <h4>Important Information</h4>
+          <p>This person will be contacted in case of medical emergency</p>
+        </div>
+      </div>
+
+      <div className="mobile-form-grid">
+        <div className="mobile-input-group">
+          <label>Emergency Contact Name</label>
+          <input
+            type="text"
+            name="emergencyContactName"
+            value={formData.emergencyContactName}
+            onChange={handleInputChange}
+            placeholder="Full name of emergency contact"
+            className={`mobile-reg-form-input ${fieldErrors.emergencyContactName ? 'invalid' : ''}`}
+            required
+          />
+          {fieldErrors.emergencyContactName && (
+            <small className="error-text">{fieldErrors.emergencyContactName}</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Contact Number</label>
+          <input
+            type="tel"
+            name="emergencyContactNumber"
+            value={formData.emergencyContactNumber}
+            onChange={handleInputChange}
+            placeholder="09XX-XXX-XXXX"
+            className={`mobile-reg-form-input ${fieldErrors.emergencyContactNumber ? 'invalid' : ''}`}
+            required
+          />
+          {fieldErrors.emergencyContactNumber && (
+            <small className="error-text">{fieldErrors.emergencyContactNumber}</small>
+          )}
+          {formData.emergencyContactNumber === formData.contactNumber && (
+            <small className="error-text">Emergency contact number cannot be the same as patient's number</small>
+          )}
+        </div>
+
+        <div className="mobile-input-group">
+          <label>Relationship</label>
+          <select
+            name="emergencyRelationship"
+            value={formData.emergencyRelationship}
+            onChange={handleInputChange}
+            className={`mobile-reg-form-input ${showValidation && fieldErrors.emergencyRelationship ? 'invalid' : ''}`}
+            required
+          >
+            <option value="" disabled hidden>Select relationship</option>
+            <option value="Parent">Parent</option>
+            <option value="Spouse">Spouse/Partner</option>
+            <option value="Sibling">Sibling</option>
+            <option value="Child">Child</option>
+            <option value="Relative">Other Relative</option>
+            <option value="Friend">Close Friend</option>
+            <option value="Guardian">Legal Guardian</option>
+          </select>
+          {showValidation && fieldErrors.emergencyRelationship && (
+            <small className="error-text">{fieldErrors.emergencyRelationship}</small>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderReviewStep = () => (
+    <div className="mobile-reg-card mobile-step-transition">
+      <div className="mobile-step-header">
+        <div className="mobile-step-icon">
+          <i className="fa-regular fa-clipboard"></i>
+        </div>
+        <h3>Review & Confirm</h3>
+        <p>Please verify your information</p>
+      </div>
+
+      <div className="mobile-review-sections">
+        <div className="mobile-review-section">
+          <h4><i className="fa-solid fa-user"></i> Personal Information</h4>
+          <div className="mobile-review-grid">
+            <div className="mobile-review-item">
+              <label>Full Name:</label>
+              <span>{formData.fullName}</span>
+            </div>
+            <div className="mobile-review-item">
+              <label>Age & Sex:</label>
+              <span>{formData.age} years old, {formData.sex}</span>
+            </div>
+            <div className="mobile-review-item">
+              <label>Contact Number:</label>
+              <span>{formData.contactNumber}</span>
+            </div>
+            <div className="mobile-review-item">
+              <label>Email:</label>
+              <span>{formData.email}</span>
+            </div>
+            <div className="mobile-review-item full-width">
+              <label>Address:</label>
+              <span>{formData.address}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mobile-review-section">
+          <h4><i className="fa-solid fa-bell"></i> Emergency Contact</h4>
+          <div className="mobile-review-grid">
+            <div className="mobile-review-item">
+              <label>Name:</label>
+              <span>{formData.emergencyContactName}</span>
+            </div>
+            <div className="mobile-review-item">
+              <label>Number:</label>
+              <span>{formData.emergencyContactNumber}</span>
+            </div>
+            <div className="mobile-review-item">
+              <label>Relationship:</label>
+              <span>{formData.emergencyRelationship}</span>
+            </div>
+          </div>
+        </div>
+
+        {formData.idType && (
+          <div className="mobile-review-section">
+            <h4><i className="fa-solid fa-id-card"></i> ID Information</h4>
+            <div className="mobile-review-grid">
+              <div className="mobile-review-item">
+                <label>ID Type:</label>
+                <span>{formData.idType}</span>
+              </div>
+              <div className="mobile-review-item">
+                <label>ID Number:</label>
+                <span>{formData.idNumber}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mobile-terms">
+        <label className={`mobile-checkbox-label ${showValidation && fieldErrors.termsAccepted ? 'invalid' : ''}`}>
+          <input 
+            type="checkbox" 
+            checked={termsAccepted}
+            onChange={(e) => {
+              setTermsAccepted(e.target.checked);
+              if (e.target.checked) {
+                const newErrors = { ...fieldErrors };
+                delete newErrors.termsAccepted;
+                setFieldErrors(newErrors);
+              }
+            }}
+            className={showValidation && fieldErrors.termsAccepted ? 'invalid' : ''}
+            required 
+          />
+          <span>
+            I confirm that all information provided is accurate and I agree to the
+            <strong> Terms and Conditions</strong> and <strong>Privacy Policy </strong>
+            of CliCare Hospital.
+          </span>
+        </label>
+        {showValidation && fieldErrors.termsAccepted && (
+          <small className="error-text">{fieldErrors.termsAccepted}</small>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderNavigationButtons = () => {
+    if (currentStep === 3) {
+      return (
+        <div className="mobile-nav-buttons">
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="mobile-nav-btn secondary"
+            disabled={loading}
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+          <button 
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading || !validateStep(currentStep)}
+            className="mobile-nav-btn submit"
+          >
+            Continue<i className="fa-solid fa-greater-than"></i>
+          </button> 
+        </div>
+      );
+    }
+
+    return (
+      <div className="mobile-nav-buttons">
+        {currentStep > 1 ? (
+          <button 
+            type="button" 
+            onClick={prevStep}
+            className="mobile-nav-btn secondary"
+          >
+            <i className="fa-solid fa-less-than"></i>Back
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => window.location.href = '/mobile-patient-login'}
+            className="mobile-nav-btn home"
+          >
+            <i className="fa-solid fa-less-than"></i>Back to Home
+          </button>
+        )}
+        <button 
+          type="button"
+          onClick={nextStep}
+          className="mobile-nav-btn primary"
+        >
+          Continue<i className="fa-solid fa-greater-than"></i>
+        </button>
+      </div>
+    );
+  };
+
+  const renderProgressBar = () => (
+    <div className="mobile-progress-container">
+      <div className="mobile-progress-steps">
+        {['Personal', 'Emergency', 'Review'].map((name, index) => {
+          const stepNumber = index + 1;
+          const isActive = stepNumber === currentStep;
+          const isCompleted = stepNumber < currentStep;
+          const isLast = index === 2; // Last step (Review)
+
+          return (
+            <div key={index} className="mobile-progress-step-item">
+              <div className={`mobile-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
+                <div className="mobile-step-number">
+                  {isCompleted ? <i className="fa-solid fa-check"></i> : stepNumber}
+                </div>
+                <div className="mobile-step-label">{name}</div>
+              </div>
+              {!isLast && (
+                <div className={`mobile-step-connector ${isCompleted ? 'completed' : ''} ${stepNumber === currentStep ? 'active' : ''}`}></div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mobile-registration-portal">
+      <div className="mobile-reg-header">
+        <div className="mobile-reg-logo">
+          <i className="fa-solid fa-hospital"></i>
+        </div>
+        <div className="mobile-reg-title">
+          <h1>CliCare</h1>
+          <p>Patient Registration System</p>
+        </div>
+        <div className="mobile-hospital-info">
+          <p><strong>{formatTime(currentTime)}</strong></p>
+          <p>{formatDate(currentTime)}</p>
+        </div>
+      </div>
+
+      {renderProgressBar()}
+      
+      <div className="mobile-reg-content">
+        {currentStep === 1 && renderPersonalDetailsStep()}
+        {currentStep === 2 && renderEmergencyContactStep()}
+        {currentStep === 3 && renderReviewStep()}
+      </div>
+
+      <div className="mobile-nav-container">
+        {renderNavigationButtons()}
+      </div>
+
+      <div className="mobile-help-footer">
+        <div className="mobile-help-section">
+          <h4>Need Help?</h4>
+          <p>Press the help button or ask hospital staff for assistance</p>
+        </div>
+      </div>
+
+      {renderCameraModal()}
+    </div>
+  );
+};
+
+export default MobilePatientRegistration;
