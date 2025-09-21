@@ -1,0 +1,202 @@
+// App.js
+import React from 'react';
+import './App.css';
+
+// Mobile Patient Components
+import MobilePatientLogin from './components/mobile/mobilepatientlogin';
+import MobilePatientRegistration from './components/mobile/mobilepatientregistration';
+import MobilePatientDashboard from './components/mobile/mobilepatientdashboard';
+import MobileHealthAssessment from './components/mobile/mobilehealthassessment';
+
+// Admin Components
+import AdminLogin from './components/admin/adminlogin';
+import AdminDashboard from './components/admin/admindashboard';
+
+// Healthcare Components
+import HealthcareLogin from './components/healthcare/healthcarelogin';
+import HealthcareDashboard from './components/healthcare/healthcaredashboard';
+
+// Terminal Components
+import TerminalPatientLogin from './components/terminal/terminalpatientlogin';
+import TerminalPatientRegistration from './components/terminal/terminalpatientregistration';
+
+import { supabase } from './supabase';
+
+const App = () => {
+  const [currentRoute, setCurrentRoute] = React.useState(
+    window.location.pathname || '/'
+  );
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      setCurrentRoute(window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentRoute(path);
+  };
+
+  // Auth Protection Helper
+  const requireAuth = (tokenKey, infoKey, loginPath) => {
+    const token = localStorage.getItem(tokenKey);
+    const info = localStorage.getItem(infoKey);
+    
+    if (!token || !info) {
+      localStorage.clear();
+      window.location.replace(loginPath);
+      return false;
+    }
+    return true;
+  };
+
+  const testSupabaseConnection = async () => {
+    try {
+      const { data, error } = await supabase.from('outPatient').select('count');
+      if (error) {
+        console.log('Supabase connection error:', error);
+      } else {
+        console.log('Supabase connected successfully!', data);
+      }
+    } catch (err) {
+      console.log('Connection test failed:', err);
+    }
+  };
+
+  const LandingPage = () => {
+    return (
+      <div className="landing-page">
+        <div className="landing-container">
+          
+          <h1 className="landing-title">CliCare</h1>
+
+          <div className="patient-access-section">
+            <h3 className="section-title">Patient Access</h3>
+              
+            <div className="patient-buttons">
+              <button
+                onClick={() => navigate('/mobile-patient-login')}
+                className="patient-btn patient-btn-mobile"
+              >
+                👤 Mobile Patient
+              </button>
+                
+              <button
+                onClick={() => navigate('/terminal-patient-login')}
+                className="patient-btn patient-btn-kiosk"
+              >
+                🖥️ Kiosk Patient
+              </button>
+              
+            </div>
+          </div>
+
+          <div className="staff-access-section">
+            <h3 className="section-title">Staff Access</h3>
+            
+            <div className="staff-buttons">
+              <button
+                onClick={() => navigate('/admin-login')}
+                className="staff-btn staff-btn-admin"
+              >
+                👨‍💼 HealthAdmin
+              </button>
+              
+              <button
+                onClick={() => navigate('/healthcare-login')}
+                className="staff-btn staff-btn-healthcare"
+              >
+                👨‍⚕️ HealthStaff
+              </button>
+            
+            </div>
+          </div>
+
+          <div className="footer-info">
+            <p>🔒 Secure access • Need help? Call (02) 8123-4567</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const NotFound = () => {
+    return (
+      <div className="not-found-page">
+        <div className="not-found-container">
+          <h1 className="not-found-title">404</h1>
+          <h2 className="not-found-subtitle">Page Not Found</h2>
+          <p className="not-found-description">
+            The page you're looking for doesn't exist.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="back-home-btn"
+          >
+            ← Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCurrentRoute = () => {
+    switch (currentRoute) {
+      case '/':
+        return <LandingPage />;
+      
+      case '/mobile-patient-login':
+        return <MobilePatientLogin />;
+      case '/mobile-patient-register':
+        return <MobilePatientRegistration />;
+      case '/mobile-patient-dashboard':
+        if (!requireAuth('patientToken', 'patientId', '/mobile-patient-login')) return null;
+        return <MobilePatientDashboard />;
+      case '/mobile-health-assessment':
+        return <MobileHealthAssessment />;
+      
+      case '/admin-login':
+        return <AdminLogin />;
+      case '/admin-dashboard':
+        if (!requireAuth('adminToken', 'adminInfo', '/admin-login')) return null;
+        return <AdminDashboard />;
+      
+      case '/healthcare-login':
+        return <HealthcareLogin />;
+      case '/healthcare-dashboard':
+        if (!requireAuth('healthcareToken', 'staffInfo', '/healthcare-login')) return null;
+        return <HealthcareDashboard />;
+
+      case '/terminal-patient-login':
+        return <TerminalPatientLogin />;
+      case '/terminal-patient-registration':
+        return <TerminalPatientRegistration />;
+      
+      // Legacy redirects
+      case '/patient-login':
+        navigate('/mobile-patient-login');
+        return <MobilePatientLogin />;
+      case '/patient-register':
+        navigate('/mobile-patient-register');
+        return <MobilePatientRegistration />;
+      case '/terminal-kiosk':
+        navigate('/terminal-patient-login');
+        return <TerminalPatientLogin />;
+      
+      default:
+        return <NotFound />;
+    }
+  };
+
+  return (
+    <div className="App">
+      {renderCurrentRoute()}
+    </div>
+  );
+};
+
+export default App;
