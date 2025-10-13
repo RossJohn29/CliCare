@@ -1,0 +1,476 @@
+/* weblogin.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import '@fortawesome/fontawesome-free/css/all.css';
+
+.weblogin-portal {
+  min-height: 100vh;
+  background: #f0f4f0;
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.weblogin-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.weblogin-footer {
+  text-align: center;
+  padding: 10px;
+  background: #ffffff;
+  margin-top: auto;
+}
+
+.weblogin-footer p {
+  color: #6b7280;
+  font-size: 0.7em;
+  margin: 3px 0;
+  font-weight: 400;
+}
+
+.weblogin-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 35px 30px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.weblogin-form-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.weblogin-form-header h3 {
+  color: #27371f;
+  font-size: 1.5em;
+  margin: 0 0 6px 0;
+  font-weight: 600;
+}
+
+.weblogin-form-header p {
+  color: #6b7280;
+  font-size: 0.875em;
+  margin: 0;
+  font-weight: 400;
+}
+
+.weblogin-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.web-indicator {
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  background: #1a672a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.weblogin-indicator-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.weblogin-indicator .fa-regular.fa-user,
+.weblogin-indicator .fa-solid.fa-user-plus {
+  color: #ffffff;
+}
+
+.weblogin-input-group {
+  margin-bottom: 20px;
+}
+
+.weblogin-input-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: #37513f;
+  font-weight: 600;
+  font-size: 0.875em;
+}
+
+.weblogin-form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  background: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+  color: #27371f;
+}
+
+.weblogin-form-input:focus {
+  outline: none;
+  border-color: #1a672a;
+  background: #f9fafb;
+}
+
+.weblogin-form-input.invalid,
+.weblogin-form-input.invalid:focus {
+  border-color: #ef4444;
+}
+
+.weblogin-form-input:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.weblogin-input-hint {
+  display: block;
+  color: #6b7280;
+  font-size: 0.8em;
+  margin-top: 6px;
+  font-weight: 400;
+}
+
+.weblogin-input-hint .fa-solid.fa-square-check {
+  color: #1a672a;
+}
+
+.weblogin-input-hint .fa-solid.fa-triangle-exclamation {
+  color: #f59e0b;
+}
+
+.error-text {
+  display: block;
+  color: #ef4444;
+  font-size: 0.8em;
+  margin-top: 6px;
+  font-weight: 500;
+  font-family: 'Poppins', sans-serif;
+}
+
+.weblogin-error {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  border-left: 4px solid #dc2626;
+  font-weight: 500;
+  text-align: left;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9em;
+}
+
+.weblogin-access-btn,
+.weblogin-otp-send-btn {
+  background: #1a672a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.weblogin-access-btn {
+  width: 100%;
+  padding: 13px;
+  font-size: 15px;
+  margin-bottom: 22px;
+}
+
+.weblogin-otp-send-btn {
+  padding: 12px 16px;
+  font-size: 13px;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.weblogin-access-btn:hover:not(:disabled),
+.weblogin-otp-send-btn:hover:not(:disabled),
+.weblogin-access-btn:active:not(:disabled),
+.weblogin-otp-send-btn:active:not(:disabled) {
+  background: #155422;
+}
+
+.weblogin-access-btn:disabled,
+.weblogin-otp-send-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.weblogin-method-toggle {
+  display: flex;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 12px;
+  gap: 4px;
+}
+
+.weblogin-method-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  background: transparent;
+  color: #6b7280;
+  font-family: 'Poppins', sans-serif;
+  transition: all 0.2s ease;
+}
+
+.weblogin-method-btn.active {
+  background: #ffffff;
+  color: #1a672a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.weblogin-account-toggle {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.weblogin-account-toggle p {
+  color: #6b7280;
+  font-size: 0.875em;
+  margin: 0;
+}
+
+.weblogin-account-link {
+  background: none;
+  border: none;
+  color: #1a672a;
+  cursor: pointer;
+  font-size: 0.875em;
+  font-weight: 600;
+  text-decoration: underline;
+  font-family: 'Poppins', sans-serif;
+}
+
+.weblogin-account-link:hover {
+  color: #155422;
+  text-decoration: none;
+}
+
+.weblogin-types {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.weblogin-btn {
+  display: flex;
+  align-items: center;
+  padding: 18px;
+  border: 2px solid #d9dade;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  font-family: 'Poppins', sans-serif;
+  gap: 16px;
+}
+
+.weblogin-btn:hover {
+  background: #f1f1f1;
+  border: 2px solid #f1f1f1;
+}
+
+.weblogin-btn .icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #f1f1f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a672a;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.weblogin-btn-content h3 {
+  margin: 0 0 2px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #27371f;
+}
+
+.weblogin-btn-content p {
+  font-size: 13px;
+  color: #1a672a;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+}
+
+.weblogin-btn-content small {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.weblogin-reg-info {
+  margin: 20px 0;
+}
+
+.weblogin-info-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 15px;
+}
+
+.weblogin-info-card h4 {
+  color: #27371f;
+  margin-bottom: 12px;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.weblogin-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.weblogin-info-list li {
+  color: #37513f;
+  margin: 8px 0;
+  line-height: 1.5;
+  font-size: 0.85em;
+  font-weight: 400;
+  display: flex;
+  align-items: start;
+  gap: 10px;
+}
+
+.weblogin-info-list i {
+  color: #1a672a;
+  margin-top: 2px;
+}
+
+.weblogin-contact-group {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.weblogin-contact-group .weblogin-form-input {
+  flex: 1;
+}
+
+.weblogin-loading-spinner {
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .weblogin-content {
+    padding: 30px 15px;
+  }
+
+  .weblogin-card {
+    padding: 40px 32px;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .weblogin-content {
+    padding: 25px 12px;
+  }
+
+  .weblogin-card {
+    padding: 35px 28px;
+  }
+
+  .web-indicator {
+    width: 70px;
+    height: 70px;
+    font-size: 24px;
+  }
+
+  .weblogin-form-header h3 {
+    font-size: 1.6em;
+  }
+
+  .weblogin-contact-group {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .weblogin-otp-send-btn {
+    min-width: 90px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .weblogin-content {
+    padding: 20px 10px;
+  }
+
+  .weblogin-card {
+    padding: 32px 24px;
+  }
+
+  .web-indicator {
+    width: 65px;
+    height: 65px;
+    font-size: 22px;
+  }
+
+  .weblogin-form-header h3 {
+    font-size: 1.5em;
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .weblogin-content {
+    padding: 20px;
+  }
+
+  .weblogin-card {
+    padding: 30px;
+  }
+
+  .web-indicator {
+    width: 65px;
+    height: 65px;
+  }
+}
