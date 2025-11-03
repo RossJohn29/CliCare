@@ -584,117 +584,28 @@ app.get('/api/admin/dashboard-stats', authenticateToken, async (req, res) => {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Total Patients
     const { count: totalPatients } = await supabase
       .from('outPatient')
       .select('*', { count: 'exact', head: true });
 
-    // Out-Patients Today
     const { count: outPatientsToday } = await supabase
       .from('queue')
-      .select(`visit!inner(visit_date)`, { count: 'exact', head: true })
+      .select(`
+        visit!inner(visit_date)
+      `, { count: 'exact', head: true })
       .eq('visit.visit_date', today);
 
-    // ADD THIS SECTION HERE - Calculate yesterday's patients for trend
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    const { count: yesterdayPatients } = await supabase
-      .from('queue')
-      .select(`visit!inner(visit_date)`, { count: 'exact', head: true })
-      .eq('visit.visit_date', yesterdayStr);
-
-    const patientTrend = yesterdayPatients > 0 
-      ? ((outPatientsToday - yesterdayPatients) / yesterdayPatients * 100).toFixed(1)
-      : 0;
-    // END OF NEW SECTION
-
-    // Active Consultants (Online)
     const { count: activeConsultants } = await supabase
       .from('healthStaff')
       .select('*', { count: 'exact', head: true })
-      .eq('role', 'Doctor')
-      .eq('is_online', true);
+      .eq('role', 'Doctor');
 
-    // Appointments Today
     const { count: appointmentsToday } = await supabase
       .from('tempReg')
       .select('*', { count: 'exact', head: true })
       .eq('scheduled_date', today)
       .in('status', ['pending', 'completed']);
 
-    // Top 3 Health Trends (most common symptoms today)
-    const { data: symptomsData } = await supabase
-      .from('visit')
-      .select('symptoms')
-      .eq('visit_date', today);
-
-    const symptomCounts = {};
-    symptomsData?.forEach(visit => {
-      if (visit.symptoms) {
-        const symptomList = visit.symptoms.split(', ');
-        symptomList.forEach(symptom => {
-          symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
-        });
-      }
-    });
-
-    const topSymptoms = Object.entries(symptomCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name, count]) => ({ name, count }));
-
-    // System Alerts (departments with long queues)
-    const { data: queueData } = await supabase
-      .from('queue')
-      .select(`
-        department_id,
-        status,
-        department!inner(name),
-        visit!inner(visit_date)
-      `)
-      .eq('status', 'waiting')
-      .eq('visit.visit_date', today);
-
-    const departmentQueues = {};
-    queueData?.forEach(item => {
-      const deptName = item.department.name;
-      departmentQueues[deptName] = (departmentQueues[deptName] || 0) + 1;
-    });
-
-    const alerts = Object.entries(departmentQueues)
-      .filter(([_, count]) => count > 10)
-      .map(([department, count]) => ({ department, count }));
-
-    // Patient Flow Statistics
-    const { data: flowData } = await supabase
-      .from('queue')
-      .select(`
-        status,
-        department_id,
-        created_time,
-        visit!inner(visit_date)
-      `)
-      .eq('visit.visit_date', today);
-
-    const flowStats = {
-      registration: flowData?.filter(q => q.status === 'waiting').length || 0,
-      consultation: flowData?.filter(q => q.status === 'in_progress').length || 0,
-      completed: flowData?.filter(q => q.status === 'completed').length || 0
-    };
-
-    // Calculate average wait time
-    const waitTimes = flowData?.map(q => {
-      const created = new Date(q.created_time);
-      const now = new Date();
-      return Math.floor((now - created) / (1000 * 60)); // minutes
-    }) || [];
-    const avgWaitTime = waitTimes.length > 0 
-      ? Math.floor(waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length) 
-      : 0;
-
-    // MODIFY THE RESPONSE TO INCLUDE TRENDS
     res.status(200).json({
       success: true,
       stats: {
@@ -702,264 +613,11 @@ app.get('/api/admin/dashboard-stats', authenticateToken, async (req, res) => {
         outPatientToday: outPatientsToday || 0,
         activeConsultants: activeConsultants || 0,
         appointmentsToday: appointmentsToday || 0
-      },
-      trends: {
-        patients: patientTrend  // ADD THIS LINE
-      },
-      topHealthTrends: topSymptoms,
-      systemAlerts: alerts,
-      patientFlow: flowStats,
-      averageWaitTime: avgWaitTime
+      }
     });
 
   } catch (error) {
     console.error('Admin dashboard stats error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/admin/time-series-stats', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const { period } = req.query;
-    
-    let timeSeriesData = [];
-    
-    if (period === 'daily') {
-      // Last 30 days
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      // Get registration data
-      const { data: registrationData, error: regError } = await supabase
-        .from('outPatient')
-        .select('registration_date')
-        .gte('registration_date', startDate)
-        .order('registration_date', { ascending: true });
-      
-      // Get appointment data - Fixed query
-      const { data: appointmentData, error: apptError } = await supabase
-        .from('tempReg')
-        .select('created_date, scheduled_date, preferred_date')
-        .gte('created_date', startDate)
-        .not('status', 'eq', 'expired')
-        .order('created_date', { ascending: true });
-      
-      // Get completed consultations data - Fixed query
-      const { data: completedData, error: compError } = await supabase
-        .from('queue')
-        .select(`
-          created_time,
-          visit!inner(
-            visit_date,
-            visit_time
-          )
-        `)
-        .eq('status', 'completed')
-        .gte('created_time', startDate + 'T00:00:00.000Z')
-        .order('created_time', { ascending: true });
-      
-      if (regError) {
-        console.error('Registration fetch error:', regError);
-        return res.status(500).json({ error: 'Failed to fetch time series data' });
-      }
-      
-      // Group by date
-      const registrationCounts = {};
-      const appointmentCounts = {};
-      const completedCounts = {};
-      
-      // Process registrations
-      registrationData?.forEach(patient => {
-        const date = patient.registration_date;
-        registrationCounts[date] = (registrationCounts[date] || 0) + 1;
-      });
-      
-      // Process appointments - use created_date as primary, fallback to scheduled_date
-      appointmentData?.forEach(appt => {
-        let date = null;
-        if (appt.scheduled_date) {
-          date = appt.scheduled_date;
-        } else if (appt.preferred_date) {
-          date = appt.preferred_date;
-        } else if (appt.created_date) {
-          date = appt.created_date;
-        }
-        
-        if (date) {
-          appointmentCounts[date] = (appointmentCounts[date] || 0) + 1;
-        }
-      });
-      
-      // Process completed - extract date from timestamp
-      completedData?.forEach(item => {
-        let date = null;
-        if (item.visit && item.visit.visit_date) {
-          date = item.visit.visit_date;
-        } else if (item.created_time) {
-          // Extract date from timestamp
-          date = new Date(item.created_time).toISOString().split('T')[0];
-        }
-        
-        if (date) {
-          completedCounts[date] = (completedCounts[date] || 0) + 1;
-        }
-      });
-      
-      // Fill in missing dates with 0
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        timeSeriesData.push({
-          date: date,
-          count: registrationCounts[date] || 0,
-          registrations: registrationCounts[date] || 0,
-          appointments: appointmentCounts[date] || 0,
-          completed: completedCounts[date] || 0
-        });
-      }
-      
-    } else if (period === 'weekly') {
-      // Similar fixes for weekly...
-      const startDate = new Date(Date.now() - 84 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      const { data: registrationData } = await supabase
-        .from('outPatient')
-        .select('registration_date')
-        .gte('registration_date', startDate);
-      
-      const { data: appointmentData } = await supabase
-        .from('tempReg')
-        .select('created_date, scheduled_date, preferred_date')
-        .gte('created_date', startDate)
-        .not('status', 'eq', 'expired');
-      
-      const { data: completedData } = await supabase
-        .from('queue')
-        .select('created_time, visit!inner(visit_date)')
-        .eq('status', 'completed')
-        .gte('created_time', startDate + 'T00:00:00.000Z');
-      
-      // Process weekly data similar to daily but group by week
-      const registrationWeekCounts = {};
-      const appointmentWeekCounts = {};
-      const completedWeekCounts = {};
-      
-      registrationData?.forEach(patient => {
-        const date = new Date(patient.registration_date);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split('T')[0];
-        registrationWeekCounts[weekKey] = (registrationWeekCounts[weekKey] || 0) + 1;
-      });
-      
-      appointmentData?.forEach(appt => {
-        let dateStr = appt.scheduled_date || appt.preferred_date || appt.created_date;
-        if (dateStr) {
-          const date = new Date(dateStr);
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          const weekKey = weekStart.toISOString().split('T')[0];
-          appointmentWeekCounts[weekKey] = (appointmentWeekCounts[weekKey] || 0) + 1;
-        }
-      });
-      
-      completedData?.forEach(item => {
-        let dateStr = item.visit?.visit_date || item.created_time;
-        if (dateStr) {
-          const date = new Date(dateStr);
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          const weekKey = weekStart.toISOString().split('T')[0];
-          completedWeekCounts[weekKey] = (completedWeekCounts[weekKey] || 0) + 1;
-        }
-      });
-      
-      // Fill weekly data
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split('T')[0];
-        
-        timeSeriesData.push({
-          date: weekKey,
-          count: registrationWeekCounts[weekKey] || 0,
-          registrations: registrationWeekCounts[weekKey] || 0,
-          appointments: appointmentWeekCounts[weekKey] || 0,
-          completed: completedWeekCounts[weekKey] || 0
-        });
-      }
-      
-    } else if (period === 'yearly') {
-      // Similar fixes for yearly...
-      const startDate = new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      const { data: registrationData } = await supabase
-        .from('outPatient')
-        .select('registration_date')
-        .gte('registration_date', startDate);
-      
-      const { data: appointmentData } = await supabase
-        .from('tempReg')
-        .select('created_date, scheduled_date, preferred_date')
-        .gte('created_date', startDate)
-        .not('status', 'eq', 'expired');
-      
-      const { data: completedData } = await supabase
-        .from('queue')
-        .select('created_time, visit!inner(visit_date)')
-        .eq('status', 'completed')
-        .gte('created_time', startDate + 'T00:00:00.000Z');
-      
-      // Process yearly data
-      const registrationYearCounts = {};
-      const appointmentYearCounts = {};
-      const completedYearCounts = {};
-      
-      registrationData?.forEach(patient => {
-        const year = new Date(patient.registration_date).getFullYear();
-        registrationYearCounts[year] = (registrationYearCounts[year] || 0) + 1;
-      });
-      
-      appointmentData?.forEach(appt => {
-        let dateStr = appt.scheduled_date || appt.preferred_date || appt.created_date;
-        if (dateStr) {
-          const year = new Date(dateStr).getFullYear();
-          appointmentYearCounts[year] = (appointmentYearCounts[year] || 0) + 1;
-        }
-      });
-      
-      completedData?.forEach(item => {
-        let dateStr = item.visit?.visit_date || item.created_time;
-        if (dateStr) {
-          const year = new Date(dateStr).getFullYear();
-          completedYearCounts[year] = (completedYearCounts[year] || 0) + 1;
-        }
-      });
-      
-      // Fill yearly data
-      const currentYear = new Date().getFullYear();
-      for (let i = 4; i >= 0; i--) {
-        const year = currentYear - i;
-        timeSeriesData.push({
-          date: `${year}-01-01`,
-          count: registrationYearCounts[year] || 0,
-          registrations: registrationYearCounts[year] || 0,
-          appointments: appointmentYearCounts[year] || 0,
-          completed: completedYearCounts[year] || 0
-        });
-      }
-    }
-    
-    res.status(200).json({
-      success: true,
-      timeSeriesData: timeSeriesData
-    });
-    
-  } catch (error) {
-    console.error('Time series stats error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -973,93 +631,45 @@ app.post('/api/admin/analyze-data', authenticateToken, async (req, res) => {
 
     const { query, hospitalData } = req.body;
     
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // Enhanced prompt for better responses
-    const context = `You are CliCare Hospital's data analyst assistant. You're speaking directly to a hospital administrator who needs quick, actionable insights.
+    const context = `
+You are a hospital data analyst AI. Analyze the following anonymized hospital data and provide insights.
 
-CURRENT HOSPITAL DATA:
+Hospital Statistics:
 - Total Registered Patients: ${hospitalData.totalRegisteredPatients}
 - Out-Patients Today: ${hospitalData.outPatientToday}
-- Active Consultants (Online): ${hospitalData.activeConsultants}
+- Active Consultants: ${hospitalData.activeConsultants}
 - Appointments Today: ${hospitalData.appointmentsToday}
 
-PATIENT DEMOGRAPHICS:
-${hospitalData.patientSummary?.length > 0 ? JSON.stringify(hospitalData.patientSummary.slice(0, 30), null, 2) : 'No patient data available'}
+Patient Data Summary:
+${JSON.stringify(hospitalData.patientSummary, null, 2)}
 
-STAFF INFORMATION:
-${hospitalData.staffSummary?.length > 0 ? JSON.stringify(hospitalData.staffSummary, null, 2) : 'No staff data available'}
+Staff Data Summary:
+${JSON.stringify(hospitalData.staffSummary, null, 2)}
 
-USER QUESTION: "${query}"
+User Question: ${query}
 
-RESPONSE RULES:
-1. Be direct and conversational - you're talking to a busy administrator, not writing a report
-2. Answer ONLY what was asked - don't offer information they didn't request
-3. Use the exact data provided - never say "not available in the data" or mention missing information
-4. When asked, ALWAYS provide a chart visualization
-5. Keep answers concise unless specifically asked for detailed analysis
-6. Use natural language, not formal report writing
-7. If asked about trends or patterns, create visualizations to support your answer
-
-CHART GUIDELINES:
-- Use "bar" for comparisons (age groups, departments, counts)
-- Use "pie" for distributions (gender ratio, department breakdown, percentages)
-- Use "line" for trends over time (patient flow, daily patterns)
-- Use "none" only for simple yes/no questions or when no numbers are involved
-
-RESPONSE FORMAT (JSON):
+Provide your response in this JSON format:
 {
-  "textResponse": "Your direct, conversational answer here. Be friendly but professional. Use short sentences.",
+  "textResponse": "Your detailed text analysis here",
   "chartType": "bar|pie|line|none",
-  "chartData": [{"name": "Label", "value": 123}],
-  "chartTitle": "Brief chart title"
+  "chartData": [{"name": "Category", "value": 123}],
+  "chartTitle": "Chart title if applicable"
 }
 
-EXAMPLES:
-
-Question: "How many patients do we have?"
-Good: "You have ${hospitalData.totalRegisteredPatients} registered patients in total, with ${hospitalData.outPatientToday} visiting today."
-Bad: "Based on the provided data, the total number of registered patients is..."
-
-Question: "What's the gender breakdown?"
-Good: "Here's your patient gender distribution - you have [X] males and [Y] females." + provide pie chart
-Bad: "The gender distribution cannot be determined from the summary data provided."
-
-Question: "Show me department statistics"
-Good: "Your busiest departments are..." + provide bar chart
-Bad: "I would need more detailed department data to answer this question."
-
-Now answer the user's question naturally and directly:`;
+Important: Only use anonymized aggregate data. Never mention specific patient names or IDs.
+`;
 
     const result = await model.generateContent(context);
     const response = await result.response;
     const text = response.text();
     
-    // Try to extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const parsedResponse = JSON.parse(jsonMatch[0]);
-      
-      // Ensure chart data is provided when numbers are mentioned
-      if (parsedResponse.textResponse.match(/\d+/) && parsedResponse.chartType === 'none') {
-        // If response contains numbers but no chart, auto-generate one
-        const numbers = parsedResponse.textResponse.match(/(\d+)/g);
-        if (numbers && numbers.length >= 2) {
-          parsedResponse.chartType = 'bar';
-          parsedResponse.chartData = [
-            { name: 'Registered Patients', value: hospitalData.totalRegisteredPatients },
-            { name: 'Today\'s Patients', value: hospitalData.outPatientToday },
-            { name: 'Active Consultants', value: hospitalData.activeConsultants },
-            { name: 'Appointments', value: hospitalData.appointmentsToday }
-          ];
-          parsedResponse.chartTitle = 'Hospital Statistics Overview';
-        }
-      }
-      
-      return res.json(parsedResponse);
+      return res.json(JSON.parse(jsonMatch[0]));
     }
     
-    // Fallback if JSON parsing fails
     res.json({
       textResponse: text,
       chartType: "none",
@@ -1104,8 +714,7 @@ app.get('/api/admin/staff', authenticateToken, async (req, res) => {
 
     // Search by staff_id only
     if (search && search.trim() !== '') {
-      const searchTerm = search.trim();
-      query = query.or(`staff_id.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%,role.ilike.%${searchTerm}%,specialization.ilike.%${searchTerm}%,license_no.ilike.%${searchTerm}%,contact_no.like.%${searchTerm}%`);
+      query = query.ilike('staff_id', `%${search.trim()}%`);
     }
 
     const { data: staffData, error: staffError } = await query;
@@ -1115,6 +724,7 @@ app.get('/api/admin/staff', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch staff data' });
     }
 
+    // Format the data
     const formattedStaff = (staffData || []).map(staff => ({
       id: staff.id,
       staff_id: staff.staff_id,
@@ -1123,9 +733,7 @@ app.get('/api/admin/staff', authenticateToken, async (req, res) => {
       specialization: staff.specialization,
       license_no: staff.license_no,
       contact_no: staff.contact_no,
-      department_name: staff.department?.name || 'N/A',
-      is_online: staff.is_online || false,
-      last_activity: staff.last_activity || null
+      department_name: staff.department?.name || 'N/A'
     }));
 
     res.status(200).json({
@@ -1156,8 +764,7 @@ app.get('/api/admin/patients', authenticateToken, async (req, res) => {
 
     // Search by patient_id only
     if (search && search.trim() !== '') {
-      const searchTerm = search.trim();
-      query = query.or(`patient_id.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,contact_no.like.%${searchTerm}%,sex.ilike.%${searchTerm}%`);
+      query = query.ilike('patient_id', `%${search.trim()}%`);
     }
 
     const { data: patientData, error: patientError } = await query;
@@ -1599,8 +1206,6 @@ app.post('/api/check-duplicate', async (req, res) => {
 // Patient registration endpoint
 app.post('/api/patient/register', async (req, res) => {
   try {
-    console.log('📝 Patient registration request:', req.body);
-          
     const {
       name, birthday, age, sex, address, contact_no, email,
       emergency_contact_name, emergency_contact_relationship, emergency_contact_no,
@@ -1685,20 +1290,6 @@ app.post('/api/patient/register', async (req, res) => {
       });
     }
 
-    // DELETE temp registration after successful patient creation
-    if (temp_id) {
-      const { error: deleteError } = await supabase
-        .from('tempReg')
-        .delete()
-        .eq('temp_id', temp_id);
-
-      if (deleteError) {
-        console.warn('Failed to delete temp registration (non-critical):', deleteError);
-      } else {
-        console.log('✅ Temp registration deleted:', temp_id);
-      }
-    }
-
     if (emergency_contact_name && emergency_contact_relationship && emergency_contact_no) {
       const { error: emergencyError } = await supabase
         .from('emergencyContact')
@@ -1718,10 +1309,12 @@ app.post('/api/patient/register', async (req, res) => {
       const symptomsArray = Array.isArray(symptoms) ? symptoms : [symptoms];
       let assignedDepartmentId = assignDepartmentBySymptoms(symptomsArray);
       
+      // Override with Pediatrics if patient is under 18
       if (parseInt(age) < 18) {
         assignedDepartmentId = 4; // Pediatrics
       }
 
+      // Get available doctor from the assigned department
       const { data: availableDoctor } = await supabase
         .from('healthStaff')
         .select('id, name, staff_id')
@@ -1749,6 +1342,7 @@ app.post('/api/patient/register', async (req, res) => {
         .single();
 
       if (!visitError && visitData) {
+        // Generate queue number for the department
         const { data: existingQueue } = await supabase
           .from('queue')
           .select('queue_no')
@@ -1758,6 +1352,7 @@ app.post('/api/patient/register', async (req, res) => {
 
         const nextQueueNo = existingQueue.length > 0 ? existingQueue[0].queue_no + 1 : 1;
 
+        // Create queue entry
         await supabase
           .from('queue')
           .insert({
@@ -1767,6 +1362,7 @@ app.post('/api/patient/register', async (req, res) => {
             status: 'waiting'
           });
 
+        // Get department name
         const { data: departmentData } = await supabase
           .from('department')
           .select('name')
@@ -1904,123 +1500,6 @@ app.get('/api/healthcare/all-patients', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('All patients error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/healthcare/time-series-stats', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const { period } = req.query;
-    
-    // Get staff's department
-    const { data: staffData } = await supabase
-      .from('healthStaff')
-      .select('department_id')
-      .eq('id', req.user.id)
-      .single();
-
-    if (!staffData) {
-      return res.status(404).json({ error: 'Staff not found' });
-    }
-
-    let timeSeriesData = [];
-    
-    if (period === 'daily') {
-      // Last 30 days of NEW patient registrations only
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      // Get NEW patient registrations (from outPatient table)
-      const { data: registrationData } = await supabase
-        .from('outPatient')
-        .select('registration_date')
-        .gte('registration_date', startDate)
-        .order('registration_date', { ascending: true });
-      
-      // Group by date
-      const registrationCounts = {};
-      
-      registrationData?.forEach(patient => {
-        const date = patient.registration_date;
-        registrationCounts[date] = (registrationCounts[date] || 0) + 1;
-      });
-      
-      // Fill in missing dates with 0
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        timeSeriesData.push({
-          date: date,
-          registrations: registrationCounts[date] || 0
-        });
-      }
-      
-    } else if (period === 'weekly') {
-      // Last 12 weeks
-      const startDate = new Date(Date.now() - 84 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      const { data: registrationData } = await supabase
-        .from('outPatient')
-        .select('registration_date')
-        .gte('registration_date', startDate);
-      
-      const registrationWeekCounts = {};
-      
-      registrationData?.forEach(patient => {
-        const date = new Date(patient.registration_date);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split('T')[0];
-        registrationWeekCounts[weekKey] = (registrationWeekCounts[weekKey] || 0) + 1;
-      });
-      
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split('T')[0];
-        
-        timeSeriesData.push({
-          date: weekKey,
-          registrations: registrationWeekCounts[weekKey] || 0
-        });
-      }
-      
-    } else if (period === 'yearly') {
-      // Last 5 years
-      const startDate = new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      const { data: registrationData } = await supabase
-        .from('outPatient')
-        .select('registration_date')
-        .gte('registration_date', startDate);
-      
-      const registrationYearCounts = {};
-      
-      registrationData?.forEach(patient => {
-        const year = new Date(patient.registration_date).getFullYear();
-        registrationYearCounts[year] = (registrationYearCounts[year] || 0) + 1;
-      });
-      
-      const currentYear = new Date().getFullYear();
-      for (let i = 4; i >= 0; i--) {
-        const year = currentYear - i;
-        timeSeriesData.push({
-          date: `${year}-01-01`,
-          registrations: registrationYearCounts[year] || 0
-        });
-      }
-    }
-    
-    res.status(200).json({
-      success: true,
-      timeSeriesData: timeSeriesData
-    });
-    
-  } catch (error) {
-    console.error('Healthcare time series stats error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2394,112 +1873,6 @@ app.get('/api/healthcare/patient-history/:patientId', authenticateToken, async (
 
   } catch (error) {
     console.error('Patient history error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get patient history by database ID (for admin/doctor viewing any patient)
-app.get('/api/healthcare/patient-history-by-db-id/:patientDbId', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.type !== 'healthcare' && req.user.type !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const { patientDbId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    const { data: patientData, error: patientError } = await supabase
-      .from('outPatient')
-      .select(`
-        id,
-        patient_id,
-        name,
-        birthday,
-        age,
-        sex,
-        address,
-        contact_no,
-        email,
-        registration_date,
-        emergencyContact(
-          name,
-          contact_number,
-          relationship
-        )
-      `)
-      .eq('id', patientDbId)
-      .single();
-
-    if (patientError || !patientData) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-    const { data: visitHistory, error: visitError } = await supabase
-      .from('visit')
-      .select(`
-        visit_id,
-        visit_date,
-        visit_time,
-        appointment_type,
-        symptoms,
-        diagnosis(
-          diagnosis_id,
-          diagnosis_description,
-          diagnosis_type,
-          severity,
-          notes,
-          healthStaff(
-            name,
-            role,
-            specialization
-          )
-        ),
-        queue(
-          queue_no,
-          status,
-          department(
-            name
-          )
-        ),
-        labRequest(
-          request_id,
-          test_type,
-          status,
-          healthStaff(
-            name
-          )
-        )
-      `)
-      .eq('patient_id', patientData.id)
-      .order('visit_date', { ascending: false })
-      .order('visit_time', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (visitError) {
-      console.error('Visit history error:', visitError);
-      return res.status(500).json({ error: 'Failed to fetch visit history' });
-    }
-
-    const { count: totalVisits } = await supabase
-      .from('visit')
-      .select('*', { count: 'exact', head: true })
-      .eq('patient_id', patientData.id);
-
-    res.status(200).json({
-      success: true,
-      patient: patientData,
-      visitHistory: visitHistory || [],
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalVisits / limit),
-        totalVisits: totalVisits || 0,
-        hasNextPage: (page * limit) < totalVisits
-      }
-    });
-
-  } catch (error) {
-    console.error('Patient history by DB ID error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -5444,82 +4817,6 @@ app.get('/api/healthcare/medical-records/:patientId', authenticateToken, async (
   }
 });
 
-// Queue Display API - Get current queue status for TV monitor
-app.get('/api/queue/display/:departmentId', async (req, res) => {
-  try {
-    const { departmentId } = req.params;
-    const today = new Date().toISOString().split('T')[0];
-
-    // Get department name
-    const { data: department, error: deptError } = await supabase
-      .from('department')
-      .select('name')
-      .eq('department_id', departmentId)
-      .single();
-
-    if (deptError) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Department not found' 
-      });
-    }
-
-    // Get current patient being served (status = 'in_progress')
-    const { data: currentPatient } = await supabase
-      .from('queue')
-      .select(`
-        queue_no,
-        visit!inner(
-          visit_date
-        )
-      `)
-      .eq('department_id', departmentId)
-      .eq('status', 'in_progress')
-      .eq('visit.visit_date', today)
-      .maybeSingle();
-
-    // Get waiting patients (status = 'waiting')
-    const { data: waitingPatients } = await supabase
-      .from('queue')
-      .select(`
-        queue_id,
-        queue_no,
-        created_time,
-        visit!inner(
-          visit_date
-        )
-      `)
-      .eq('department_id', departmentId)
-      .eq('status', 'waiting')
-      .eq('visit.visit_date', today)
-      .order('queue_no', { ascending: true });
-
-    // Calculate wait times
-    const now = new Date();
-    const formattedWaiting = (waitingPatients || []).map(patient => ({
-      queue_id: patient.queue_id,
-      queue_no: patient.queue_no,
-      wait_minutes: Math.floor((now - new Date(patient.created_time)) / 60000)
-    }));
-
-    res.json({
-      success: true,
-      departmentName: department.name,
-      current: currentPatient ? {
-        queue_no: currentPatient.queue_no
-      } : null,
-      waiting: formattedWaiting
-    });
-
-  } catch (error) {
-    console.error('Queue display API error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
-  }
-});
-
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
@@ -5529,4 +4826,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
