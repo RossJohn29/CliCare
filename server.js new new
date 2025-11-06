@@ -5367,12 +5367,12 @@ app.get('/api/healthcare/my-patients-queue', authenticateToken, async (req, res)
     if (completedPatients && !completedError) {
       completedPatients.forEach(item => {
         allTodayPatients.push({
-          patient_id: item.visit.outPatient.patient_id,
-          name: item.visit.outPatient.name,
-          age: item.visit.outPatient.age,
-          sex: item.visit.outPatient.sex,
-          contact_no: item.visit.outPatient.contact_no,
-          email: item.visit.outPatient.email,
+          patient_id: item.visit.outpatient.patient_id,
+          name: item.visit.outpatient.name,
+          age: item.visit.outpatient.age,
+          sex: item.visit.outpatient.sex,
+          contact_no: item.visit.outpatient.contact_no,
+          email: item.visit.outpatient.email,
           lastVisit: item.visit.visit_date,
           lastSymptoms: item.visit.symptoms,
           queueStatus: 'completed',
@@ -5942,4 +5942,4 @@ app.listen(PORT, () => {
   console.log(`Database: ${SUPABASE_URL ? 'Connected' : 'Not connected'}`);
 });
 
-module.exports = app;\
+module.exports = app;
