@@ -52,7 +52,8 @@ const WebMain = () => {
     recentActivity: [],
     pendingLabRequests: [],
     upcomingAppointments: [],
-    visitHistory: []
+    visitHistory: [],
+    diagnoses: []
   });
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
@@ -76,6 +77,7 @@ const WebMain = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertModalContent, setAlertModalContent] = useState({ title: '', message: '', type: 'info' });
+  const [diagnosisHistory, setDiagnosisHistory] = useState([]);
 
   useEffect(() => {
     initializePatientData();
@@ -234,6 +236,154 @@ const WebMain = () => {
     return [];
   };
 
+  const fetchPatientDiagnoses = async () => {
+    try {
+      const token = localStorage.getItem('patientToken');
+      const patientId = localStorage.getItem('patientId');
+      
+      const response = await fetch(`http://localhost:5000/api/patient/history/${patientId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Extract all diagnoses from visit history
+        const allDiagnoses = [];
+        data.visitHistory?.forEach(visit => {
+          if (visit.diagnosis && visit.diagnosis.length > 0) {
+            visit.diagnosis.forEach(diag => {
+              allDiagnoses.push({
+                diagnosis_id: diag.diagnosis_id,
+                diagnosis_description: diag.diagnosis_description,
+                diagnosis_type: diag.diagnosis_type,
+                severity: diag.severity,
+                notes: diag.notes,
+                visit_date: visit.visit_date,
+                visit_time: visit.visit_time,
+                doctor_name: diag.healthStaff?.name || 'Unknown',
+                department: diag.healthStaff?.department?.name || 'Unknown',
+                specialization: diag.healthStaff?.specialization || ''
+              });
+            });
+          }
+        });
+        return allDiagnoses;
+      }
+    } catch (error) {
+      console.error('Failed to fetch patient diagnoses:', error);
+    }
+    return [];
+  };
+
+  const fetchRecentActivity = async () => {
+    try {
+      const token = localStorage.getItem('patientToken');
+      const patientId = localStorage.getItem('patientId');
+      
+      // Fetch visit history
+      const historyResponse = await fetch(`http://localhost:5000/api/patient/history/${patientId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      // Fetch lab requests
+      const labResponse = await fetch(`http://localhost:5000/api/patient/lab-requests/${patientId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      const activities = [];
+
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+        
+        // Process visits
+        historyData.visitHistory?.forEach(visit => {
+          const visitDateTime = new Date(`${visit.visit_date}T${visit.visit_time}`);
+          
+          // Get department name
+          let departmentName = 'Unknown';
+          if (visit.diagnosis && visit.diagnosis.length > 0 && visit.diagnosis[0].healthStaff?.department) {
+            departmentName = visit.diagnosis[0].healthStaff.department.name;
+          } else if (visit.queue && visit.queue.length > 0 && visit.queue[0].department) {
+            departmentName = visit.queue[0].department.name;
+          }
+
+          // Add visit activity
+          if (visit.queue && visit.queue.length > 0 && visit.queue[0].status === 'completed') {
+            activities.push({
+              time: visitDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              action: 'Consultation completed',
+              department: departmentName,
+              status: 'success',
+              timestamp: visitDateTime.getTime()
+            });
+          }
+
+          // Add diagnosis activity
+          if (visit.diagnosis && visit.diagnosis.length > 0) {
+            activities.push({
+              time: visitDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              action: `Diagnosed: ${visit.diagnosis[0].diagnosis_description.substring(0, 50)}${visit.diagnosis[0].diagnosis_description.length > 50 ? '...' : ''}`,
+              department: departmentName,
+              status: 'info',
+              timestamp: visitDateTime.getTime()
+            });
+          }
+        });
+      }
+
+      if (labResponse.ok) {
+        const labData = await labResponse.json();
+        
+        // Process lab requests
+        labData.labRequests?.forEach(request => {
+          const requestDate = new Date(request.created_at);
+          
+          if (request.status === 'completed' && request.labResult) {
+            const uploadDate = new Date(request.labResult.upload_date);
+            activities.push({
+              time: uploadDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              action: `Lab results uploaded: ${request.test_name}`,
+              department: request.doctor?.department || 'Laboratory',
+              status: 'success',
+              timestamp: uploadDate.getTime()
+            });
+          } else if (request.status === 'pending') {
+            activities.push({
+              time: requestDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              action: `New lab request: ${request.test_name}`,
+              department: request.doctor?.department || 'Laboratory',
+              status: 'info',
+              timestamp: requestDate.getTime()
+            });
+          }
+        });
+      }
+
+      // Sort by timestamp (most recent first) and limit to 10
+      activities.sort((a, b) => b.timestamp - a.timestamp);
+      return activities.slice(0, 10);
+      
+    } catch (error) {
+      console.error('Failed to fetch recent activity:', error);
+    }
+    return [];
+  };
+
   const loadDashboardData = async () => {
     setDataLoading(true);
     
@@ -241,6 +391,8 @@ const WebMain = () => {
       const labRequests = await fetchLabRequests();
       const visitHistory = await fetchPatientHistory();
       const labHistory = await fetchLabHistory();
+      const diagnoses = await fetchPatientDiagnoses();
+      const recentActivity = await fetchRecentActivity();
       
       setDashboardData({
         todayStats: {
@@ -248,20 +400,12 @@ const WebMain = () => {
           labRequests: labRequests.filter(req => req.status === 'pending').length || 0,
           labHistory: labHistory.length || 0
         },
-        recentActivity: [
-          { time: '14:30', action: 'Lab results uploaded', department: 'Cardiology', status: 'success' },
-          { time: '13:45', action: 'New lab request received', department: 'Internal Medicine', status: 'info' },
-          { time: '12:20', action: 'Consultation completed', department: 'General Practice', status: 'success' },
-          { time: '11:10', action: 'Blood test results ready', department: 'Laboratory', status: 'success' },
-          { time: '10:30', action: 'X-ray uploaded successfully', department: 'Radiology', status: 'success' }
-        ],
+        recentActivity: recentActivity,
         pendingLabRequests: labRequests.filter(req => req.status === 'pending') || [],
-        upcomingAppointments: [
-          { date: '2025-08-10', time: '10:00 AM', department: 'Cardiology', doctor: 'Dr. Juan Dela Cruz' },
-          { date: '2025-08-12', time: '2:00 PM', department: 'Internal Medicine', doctor: 'Dr. Maria Santos' }
-        ],
+        upcomingAppointments: [],
         visitHistory: visitHistory,
-        labHistory: labHistory
+        labHistory: labHistory,
+        diagnoses: diagnoses
       });
       
     } catch (error) {
@@ -490,6 +634,53 @@ const WebMain = () => {
     }
   ];
 
+  const fetchDiagnosisHistory = async () => {
+    try {
+      const token = localStorage.getItem('patientToken');
+      const patientId = localStorage.getItem('patientId');
+      
+      // Get patient database ID first
+      const { data: patientData } = await fetch(`http://localhost:5000/api/patient/by-id/${patientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }).then(res => res.json());
+
+      if (!patientData) return [];
+
+      // Fetch diagnosis history using the patient's database ID
+      const response = await fetch(`http://localhost:5000/api/healthcare/patient-history-by-db-id/${patientData.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Filter only visits that have diagnosis
+        const diagnosisRecords = data.visitHistory
+          .filter(visit => visit.diagnosis && visit.diagnosis.length > 0)
+          .map(visit => ({
+            visit_date: visit.visit_date,
+            visit_time: visit.visit_time,
+            diagnosis: visit.diagnosis[0].diagnosis_description,
+            severity: visit.diagnosis[0].severity,
+            doctor_name: visit.diagnosis[0].staff?.name || 'Unknown',
+            department: visit.diagnosis[0].staff?.department?.name || 'Unknown',
+            notes: visit.diagnosis[0].notes
+          }));
+        return diagnosisRecords;
+      }
+    } catch (error) {
+      console.error('Failed to fetch diagnosis history:', error);
+    }
+    return [];
+  };
+
   const getFilteredVisitHistory = () => {
     if (!historySearchTerm.trim()) {
       return dashboardData.visitHistory;
@@ -662,6 +853,15 @@ const WebMain = () => {
                   {dashboardData.labHistory ? dashboardData.labHistory.length : 0}
                 </span>
               </button>
+              <button
+                className={`webmain-profile-tab-btn ${activeProfileTab === 'diagnoses' ? 'active' : ''}`}
+                onClick={() => setActiveProfileTab('diagnoses')}
+              >
+                Diagnoses
+                <span className="webmain-profile-tab-badge">
+                  {dashboardData.diagnoses ? dashboardData.diagnoses.length : 0}
+                </span>
+              </button>
             </div>
 
             <div className="webmain-profile-tab-content">
@@ -746,22 +946,32 @@ const WebMain = () => {
               {activeProfileTab === 'activity' && (
                 <div className="webmain-profile-section">
                   <h3 className="webmain-profile-section-title">Recent Activity</h3>
-                  <div className="webmain-profile-activity-list">
-                    {dashboardData.recentActivity.map((activity, index) => (
-                      <div key={index} className="webmain-profile-activity-item">
-                        <div className="webmain-profile-activity-icon">
-                          {activity.status === 'success' ? <CheckCircle size={16} /> : 
-                          activity.status === 'warning' ? <AlertTriangle size={16} /> : 
-                          <Info size={16} />}
-                        </div>
-                        <div className="webmain-profile-activity-content">
-                          <div className="webmain-profile-activity-title">{activity.action}</div>
-                          <div className="webmain-profile-activity-desc">Department: {activity.department}</div>
-                          <div className="webmain-profile-activity-time">{activity.time}</div>
-                        </div>
+                  {dashboardData.recentActivity.length === 0 ? (
+                    <div className="webmain-empty-state">
+                      <div className="webmain-empty-icon">
+                        <Info size={40} />
                       </div>
-                    ))}
-                  </div>
+                      <h3>No Recent Activity</h3>
+                      <p>Your recent activities will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="webmain-profile-activity-list">
+                      {dashboardData.recentActivity.map((activity, index) => (
+                        <div key={index} className="webmain-profile-activity-item">
+                          <div className="webmain-profile-activity-icon">
+                            {activity.status === 'success' ? <CheckCircle size={16} /> : 
+                            activity.status === 'warning' ? <AlertTriangle size={16} /> : 
+                            <Info size={16} />}
+                          </div>
+                          <div className="webmain-profile-activity-content">
+                            <div className="webmain-profile-activity-title">{activity.action}</div>
+                            <div className="webmain-profile-activity-desc">Department: {activity.department}</div>
+                            <div className="webmain-profile-activity-time">{activity.time}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -865,6 +1075,67 @@ const WebMain = () => {
                               labItem.status === 'pending' ? 'Pending' : 
                               labItem.status === 'processing' ? 'Processing' : labItem.status}
                             </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeProfileTab === 'diagnoses' && (
+                <div className="webmain-profile-section">
+                  <h3 className="webmain-profile-section-title">Medical Diagnoses History</h3>
+                  {(!dashboardData.diagnoses || dashboardData.diagnoses.length === 0) ? (
+                    <div className="webmain-empty-state">
+                      <div className="webmain-empty-icon">
+                        <FileText size={40} />
+                      </div>
+                      <h3>No Diagnoses</h3>
+                      <p>Your medical diagnoses will appear here after consultations.</p>
+                    </div>
+                  ) : (
+                    <div className="webmain-medical-history-timeline">
+                      {dashboardData.diagnoses.map((diagnosis, index) => (
+                        <div key={index} className="webmain-history-timeline-item">
+                          <div className="webmain-history-timeline-date">
+                            {new Date(diagnosis.visit_date).toLocaleDateString()} - {diagnosis.visit_time}
+                          </div>
+                          <div className="webmain-history-timeline-card">
+                            <div className="webmain-history-timeline-title">
+                              {diagnosis.diagnosis_description}
+                            </div>
+                            <div className="webmain-history-timeline-details">
+                              <div className="webmain-history-timeline-detail">
+                                <strong>Type: </strong>
+                                <span style={{ textTransform: 'capitalize' }}>{diagnosis.diagnosis_type}</span>
+                              </div>
+                              <div className="webmain-history-timeline-detail">
+                                <strong>Severity: </strong>
+                                <span style={{ 
+                                  textTransform: 'capitalize',
+                                  color: diagnosis.severity === 'severe' ? 'var(--webmain-error)' : 
+                                        diagnosis.severity === 'moderate' ? 'var(--webmain-warning)' : 
+                                        'var(--webmain-success)'
+                                }}>
+                                  {diagnosis.severity}
+                                </span>
+                              </div>
+                              <div className="webmain-history-timeline-detail">
+                                <strong>Doctor: </strong>
+                                <span>Dr. {diagnosis.doctor_name}</span>
+                              </div>
+                              <div className="webmain-history-timeline-detail">
+                                <strong>Department: </strong>
+                                <span>{diagnosis.department}</span>
+                              </div>
+                              {diagnosis.notes && (
+                                <div className="webmain-history-timeline-detail" style={{ gridColumn: '1 / -1' }}>
+                                  <strong>Notes: </strong>
+                                  <span>{diagnosis.notes}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}

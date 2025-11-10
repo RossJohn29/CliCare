@@ -2,10 +2,8 @@
 
 export class PrintingService {
   
-  // Fetch floor plan image from database via API
   static async fetchFloorPlanImageFromDatabase(department) {
     try {
-      // Try to get department ID first if we have department name
       const deptResponse = await fetch(`http://localhost:5000/api/department-by-name/${encodeURIComponent(department)}`);
       
       if (!deptResponse.ok) {
@@ -20,15 +18,15 @@ export class PrintingService {
         return null;
       }
 
-      // Return the floor plan URL from database
-      const floorPlanUrl = deptResult.department.floor_plan_image;
-      
-      if (!floorPlanUrl) {
+      if (!deptResult.department.floor_plan_image) {
         console.warn(`⚠️ No floor plan image configured for department "${department}"`);
         return null;
       }
 
-      console.log(`✅ Successfully fetched floor plan URL for ${department}`);
+      // ✅ FIXED: The floor_plan_image is already a full URL from Supabase
+      const floorPlanUrl = deptResult.department.floor_plan_image;
+      
+      console.log(`✅ Successfully fetched floor plan URL for ${department}:`, floorPlanUrl);
       return floorPlanUrl;
       
     } catch (err) {
@@ -71,7 +69,7 @@ export class PrintingService {
     return `DOC${timestamp}${random}`;
   }
 
-  // Main method - now ASYNC to fetch data before opening window
+  // ✅ FIXED: Main method - now uses iframe instead of window.open()
   static async generatePatientGuidancePacket(registrationResult, patientData, formData) {
     try {
       console.log('🖨️ Starting print generation...');
@@ -95,12 +93,19 @@ export class PrintingService {
       const formattedDate = issueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       const formattedTime = issueDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       
-      console.log('🪟 Opening print window...');
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      
-      if (!printWindow) {
-        throw new Error('Failed to open print window. Please allow popups for this site.');
-      }
+      // ✅ FIXED: Create iframe instead of window.open()
+      console.log('📄 Creating print iframe...');
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.visibility = 'hidden';
+      document.body.appendChild(printFrame);
+
+      const printDoc = printFrame.contentWindow.document;
       
       const printContent = `
         <!DOCTYPE html>
@@ -376,34 +381,6 @@ export class PrintingService {
               color: var(--muted);
             }
 
-            /* Buttons */
-            .actions {
-              display: flex;
-              gap: 10px;
-              margin-top: 16px;
-            }
-            
-            .btn {
-              padding: 10px 14px;
-              border-radius: 6px;
-              border: 1px solid transparent;
-              font-weight: 600;
-              cursor: pointer;
-              font-family: Inter, Arial, sans-serif;
-            }
-            
-            .btn-primary {
-              background: var(--clicare-green);
-              color: #fff;
-              border-color: rgba(0,0,0,0.04);
-            }
-            
-            .btn-secondary {
-              background: #fff;
-              color: var(--clicare-green);
-              border: 1px solid rgba(26,103,42,0.14);
-            }
-
             /* Responsive */
             @media (max-width: 900px) {
               .panel {
@@ -422,6 +399,7 @@ export class PrintingService {
               body {
                 background: #fff;
                 print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
               }
               
               .page-wrap {
@@ -432,10 +410,6 @@ export class PrintingService {
                 box-shadow: none;
                 border: none;
                 max-width: 100%;
-              }
-              
-              .no-print {
-                display: none;
               }
             }
           </style>
@@ -556,7 +530,7 @@ export class PrintingService {
               <section class="section">
                 <h3>Floor Plan Preview</h3>
                 <div class="box floor-plan">
-                  <img src="${floorPlanImage}" alt="Floor plan for ${department}" loading="lazy" />
+                  <img src="${floorPlanImage}" alt="Floor plan for ${department}" loading="eager" crossorigin="anonymous" style="max-width: 100%; height: auto;" />
                   <div class="floor-meta">
                     <div style="font-weight:700;margin-bottom:8px">${department} — Floor Plan</div>
                     <div class="muted-note">Reference this map for efficient navigation to your department.</div>
@@ -609,31 +583,55 @@ export class PrintingService {
                 <div><strong>Reference:</strong> ${this.generateVisitId()}</div>
                 <div style="margin-left:auto;color:var(--muted)">CliCare Hospital • Medical Center & Healthcare Institution</div>
               </div>
-
-              <div class="no-print" style="text-align: center; margin-top: 20px;">
-                <button onclick="window.print()" class="btn btn-primary">🖨️ Print Packet</button>
-                <button onclick="window.close()" class="btn btn-secondary">✖️ Close</button>
-              </div>
             </div>
           </div>
         </body>
         </html>
       `;
       
-      console.log('📝 Writing content to print window...');
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      
-      // Auto-print after a delay to ensure content is loaded
+      console.log('📝 Writing content to print frame...');
+      printDoc.open();
+      printDoc.write(printContent);
+      printDoc.close();
+
+      // Wait for images to load before printing
       console.log('⏳ Waiting for content to load...');
+      await new Promise((resolve) => {
+        if (floorPlanImage) {
+          const img = printDoc.querySelector('img');
+          if (img) {
+            // Add crossorigin attribute to handle Supabase images
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+              console.log('✅ Floor plan loaded');
+              setTimeout(resolve, 1000); // Increased delay for external images
+            };
+            img.onerror = (e) => {
+              console.warn('⚠️ Floor plan failed to load:', e);
+              setTimeout(resolve, 500);
+            };
+            // Fallback timeout
+            setTimeout(resolve, 5000); // Increased timeout for external images
+          } else {
+            setTimeout(resolve, 500);
+          }
+        } else {
+          setTimeout(resolve, 500);
+        }
+      });
+
+      console.log('🖨️ Triggering print dialog...');
+      printFrame.contentWindow.focus();
+      printFrame.contentWindow.print();
+
+      // Clean up after printing
       setTimeout(() => {
-        console.log('🖨️ Triggering print dialog...');
-        printWindow.focus();
-        printWindow.print();
+        document.body.removeChild(printFrame);
+        console.log('✅ Print generation completed successfully!');
       }, 1000);
       
-      console.log('✅ Print generation completed successfully!');
-      return printWindow;
+      return true;
       
     } catch (error) {
       console.error('❌ Print generation failed:', error);
@@ -642,60 +640,90 @@ export class PrintingService {
     }
   }
   
-  // Alternative method for thermal receipt printers (if available)
+  // ✅ FIXED: Alternative method for thermal receipt printers
   static printThermalReceipt(registrationResult, patientData, formData) {
-    const currentData = patientData || formData;
-    
-    const receiptContent = `
-      ================================
-      🏥 CLICARE HOSPITAL
-      Patient Registration Receipt
-      ================================
+    try {
+      const currentData = patientData || formData;
       
-      PATIENT ID: ${registrationResult.patientId}
+      const receiptContent = `
+        ================================
+        🏥 CLICARE HOSPITAL
+        Patient Registration Receipt
+        ================================
+        
+        PATIENT ID: ${registrationResult.patientId}
+        
+        Name: ${currentData.fullName || currentData.name}
+        Age/Sex: ${currentData.age} / ${currentData.sex}
+        
+        DEPARTMENT: ${registrationResult.recommendedDepartment}
+        QUEUE NO: ${registrationResult.queue_number || this.generateQueueNumber()}
+        
+        SYMPTOMS:
+        ${(currentData.selectedSymptoms || []).join(', ')}
+        
+        NEXT STEPS:
+        1. Go to Reception Desk
+        2. Present this receipt
+        3. Proceed to ${registrationResult.recommendedDepartment}
+        4. Wait for queue number
+        
+        Visit: ${new Date().toLocaleString()}
+        ================================
+        Keep this receipt for your visit
+        ================================
+      `;
       
-      Name: ${currentData.fullName || currentData.name}
-      Age/Sex: ${currentData.age} / ${currentData.sex}
+      // ✅ FIXED: Use iframe instead of window.open()
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.visibility = 'hidden';
+      document.body.appendChild(printFrame);
+
+      const printDoc = printFrame.contentWindow.document;
       
-      DEPARTMENT: ${registrationResult.recommendedDepartment}
-      QUEUE NO: ${registrationResult.queue_number || this.generateQueueNumber()}
+      printDoc.open();
+      printDoc.write(`
+        <html>
+        <head>
+          <title>Receipt</title>
+          <style>
+            body {
+              font-family: monospace;
+              white-space: pre-wrap;
+              font-size: 12px;
+              margin: 20px;
+            }
+            @media print {
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>${receiptContent}</body>
+        </html>
+      `);
+      printDoc.close();
       
-      SYMPTOMS:
-      ${(currentData.selectedSymptoms || []).join(', ')}
+      setTimeout(() => {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1000);
+      }, 500);
       
-      NEXT STEPS:
-      1. Go to Reception Desk
-      2. Present this receipt
-      3. Proceed to ${registrationResult.recommendedDepartment}
-      4. Wait for queue number
+      return true;
       
-      Visit: ${new Date().toLocaleString()}
-      ================================
-      Keep this receipt for your visit
-      ================================
-    `;
-    
-    // For thermal printers, you would typically use a specific printing library
-    // This is a fallback that creates a simple text format
-    const receiptWindow = window.open('', '_blank', 'width=400,height=600');
-    receiptWindow.document.write(`
-      <html>
-      <head><title>Receipt</title></head>
-      <body style="font-family: monospace; white-space: pre-wrap; font-size: 12px; margin: 20px;">
-        ${receiptContent}
-        <div style="text-align: center; margin-top: 20px;">
-          <button onclick="window.print()" style="padding: 10px 20px; background: #1a672a; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Receipt</button>
-        </div>
-      </body>
-      </html>
-    `);
-    receiptWindow.document.close();
-    
-    setTimeout(() => {
-      receiptWindow.print();
-    }, 500);
-    
-    return receiptWindow;
+    } catch (error) {
+      this.handlePrintError(error);
+      return false;
+    }
   }
   
   // Method to check if printing is supported

@@ -1455,6 +1455,32 @@ const KioskRegistration = () => {
     }
   };
 
+  const checkPendingQueue = async (fullName, birthday, address) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/check-pending-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          birthday,
+          address: address.trim()
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error checking pending queue:', result);
+        return { hasPending: false }; // Allow registration on error
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Failed to check pending queue:', error);
+      return { hasPending: false }; // Allow registration on error
+    }
+  };
 
   const handleSubmit = async () => {
     console.log('🚀 Form submission started');
@@ -1487,6 +1513,25 @@ const KioskRegistration = () => {
     setError('');
 
     try {
+      // ✅ NEW: Check for pending queue
+      if (patientType === 'new') {
+        const pendingCheck = await checkPendingQueue(
+          formData.fullName,
+          formData.birthday,
+          formData.address
+        );
+
+        if (pendingCheck.hasPending) {
+          setLoading(false);
+          showAlertModal(
+            'Pending Consultation Detected',
+            `You already have a pending consultation (Queue #${pendingCheck.queueNumber}) at ${pendingCheck.departmentName}.\n\nPlease wait for it to be completed before registering again.`,
+            'error'
+          );
+          return;
+        }
+      }
+
       let result;
       
       if (patientType === 'returning') {

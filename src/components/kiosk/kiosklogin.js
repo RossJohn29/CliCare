@@ -28,6 +28,7 @@ const KioskLogin = () => {
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [justSent, setJustSent] = useState(false);
+  const [checkTimeout, setCheckTimeout] = useState(null);
 
   useEffect(() => {
     let timer;
@@ -36,6 +37,15 @@ const KioskLogin = () => {
     }
     return () => clearTimeout(timer);
   }, [countdown]);
+
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      if (checkTimeout) {
+        clearTimeout(checkTimeout);
+      }
+    };
+  }, [checkTimeout]);
 
   // Enhanced phone number validation
   const validatePhoneNumber = (phone) => {
@@ -50,15 +60,56 @@ const KioskLogin = () => {
     return emailRegex.test(email);
   };
 
+  const checkReturningPatientPendingQueue = async (patientId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/check-pending-queue-by-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ patientId })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error checking pending queue:', result);
+        return { hasPending: false }; // Allow login on error
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Failed to check pending queue:', error);
+      return { hasPending: false }; // Allow login on error
+    }
+  };
+
   const handleInputChange = (e) => {
-    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setCredentials({ ...credentials, [name]: value });
     
-    if (showValidation) {
+    // Real-time pending queue check for Patient ID with debouncing
+    if (name === 'patientId') {
+      // Clear previous timeout
+      if (checkTimeout) {
+        clearTimeout(checkTimeout);
+      }
+      
+      // Set new timeout for checking (wait 500ms after user stops typing)
+      const newTimeout = setTimeout(() => {
+        checkPendingQueueRealtime(value);
+      }, 500);
+      
+      setCheckTimeout(newTimeout);
+    }
+    
+    if (showValidation && !error.includes('Active Consultation')) {
       setShowValidation(false);
       setFieldErrors({});
     }
     
-    setError('');
+    if (!error.includes('Active Consultation')) {
+      setError('');
+    }
   };
 
   const handleMethodSwitch = (method) => {
@@ -72,11 +123,62 @@ const KioskLogin = () => {
     setShowValidation(false);
   };
 
+  const checkPendingQueueRealtime = async (patientId) => {
+    if (!patientId || patientId.trim().length < 3) {
+      return false; // Don't check until at least 3 characters
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/outpatient/check-queue-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ patientId: patientId.toUpperCase() })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.hasPendingQueue) {
+        const statusText = data.status === 'waiting' ? 'Waiting' : 'In Progress';
+        setError(
+          `⚠️ Active Consultation Detected\n\n` +
+          `Queue Number: ${data.queueNumber}\n` +
+          `Department: ${data.departmentName}\n` +
+          `Status: ${statusText}\n\n` +
+          `Please complete your current consultation before logging in again.`
+        );
+        setFieldErrors({ patientId: 'Active queue detected' });
+        
+        // Disable the send code button
+        setSendingCode(true);
+        
+        return true; // Has pending queue
+      } else {
+        // Clear error if no pending queue
+        if (error.includes('Active Consultation')) {
+          setError('');
+          setFieldErrors({});
+          setSendingCode(false);
+        }
+        return false;
+      }
+    } catch (err) {
+      console.error('Queue check error:', err);
+      return false;
+    }
+  };
+
   const handleSendOTP = async () => {
     const stepErrors = {};
     
     if (!credentials.patientId.trim()) {
       stepErrors.patientId = 'Patient ID is required';
+    } else {
+      // Check for pending queue before sending OTP
+      const hasPendingQueue = await checkPendingQueueRealtime(credentials.patientId);
+      if (hasPendingQueue) {
+        return; // Stop OTP sending if pending queue exists
+      }
     }
 
     const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
@@ -87,7 +189,6 @@ const KioskLogin = () => {
         stepErrors.phoneNumber = 'Phone number is required';
       }
     } else {
-      // Enhanced validation
       if (loginMethod === 'email' && !validateEmail(contactValue)) {
         stepErrors.email = 'Please enter a valid email address';
       }
@@ -149,6 +250,13 @@ const KioskLogin = () => {
 
     if (!credentials.patientId.trim()) {
       stepErrors.patientId = 'Patient ID is required';
+    } else {
+      // Final check before login
+      const hasPendingQueue = await checkPendingQueueRealtime(credentials.patientId);
+      if (hasPendingQueue) {
+        setLoading(false);
+        return;
+      }
     }
 
     if (!codeSent) {
@@ -199,6 +307,14 @@ const KioskLogin = () => {
       if (!response.ok) {
         setError(data.error || 'Login failed. Please check your verification code.');
         setLoading(false);
+        return;
+      }
+
+      const pendingCheck = await checkReturningPatientPendingQueue(data.patient.patient_id);
+
+      if (pendingCheck.hasPending) {
+        setLoading(false);
+        setError(`You already have a pending consultation (Queue #${pendingCheck.queueNumber}) at ${pendingCheck.departmentName}. Please wait for it to be completed before logging in again.`);
         return;
       }
 

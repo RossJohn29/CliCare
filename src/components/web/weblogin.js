@@ -72,11 +72,70 @@ const WebLogin = () => {
     setShowValidation(false);
   };
 
+  const checkPendingQueueRealtime = async (patientId) => {
+    if (!patientId || patientId.trim().length < 3) {
+      return; // Don't check until at least 3 characters
+    }
+
+    try {
+      console.log('🔍 Checking queue status for:', patientId);
+      
+      const response = await fetch('http://localhost:5000/api/outpatient/check-queue-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ patientId: patientId.toUpperCase() })
+      });
+
+      const data = await response.json();
+      console.log('📊 Queue check result:', data);
+
+      if (data.success && data.hasPendingQueue) {
+        console.log('⚠️ Pending queue detected - Is newly registered:', data.isNewlyRegistered);
+        
+        // ✅ UPDATED: Only block if patient is newly registered
+        if (data.isNewlyRegistered) {
+          console.log('🚫 Blocking login - newly registered patient with pending queue');
+          setError(
+            `You cannot log in while your registration is being processed.\n\n` +
+            `Queue Number: ${data.queueNumber}\n` +
+            `Department: ${data.departmentName}\n` +
+            `Status: ${data.status === 'waiting' ? 'Waiting' : 'In Progress'}\n\n` +
+            `Please wait until your consultation is completed before logging in again.`
+          );
+          setFieldErrors({ patientId: 'Active queue detected' });
+          return true; // Has pending queue AND is newly registered
+        } else {
+          // Existing patient with pending queue - allow login but show info
+          console.log('✅ Allowing login - existing patient with pending queue (Queue #' + data.queueNumber + ')');
+          return false;
+        }
+      } else {
+        console.log('✅ No pending queue - allowing login');
+        // Clear error if no pending queue
+        if (error.includes('active consultation') || error.includes('registration is being processed')) {
+          setError('');
+          setFieldErrors({});
+        }
+        return false;
+      }
+    } catch (err) {
+      console.error('❌ Queue check error:', err);
+      return false;
+    }
+  };
+
   const handleSendOTP = async () => {
     const stepErrors = {};
     
     if (!credentials.patientId.trim()) {
       stepErrors.patientId = 'Patient ID is required';
+    } else {
+      // Check for pending queue before sending OTP
+      const hasPendingQueue = await checkPendingQueueRealtime(credentials.patientId);
+      if (hasPendingQueue) {
+        return; // Stop OTP sending if pending queue exists
+      }
     }
 
     const contactValue = loginMethod === 'email' ? credentials.email : credentials.phoneNumber;
@@ -87,7 +146,6 @@ const WebLogin = () => {
         stepErrors.phoneNumber = 'Phone number is required';
       }
     } else {
-      // Enhanced validation
       if (loginMethod === 'email' && !validateEmail(contactValue)) {
         stepErrors.email = 'Please enter a valid email address';
       }
@@ -182,7 +240,7 @@ const WebLogin = () => {
         deviceType: 'web'
       };
 
-      console.log('Sending login request:', requestBody);
+      console.log('📤 Sending login request:', requestBody);
 
       const response = await fetch('http://localhost:5000/api/outpatient/verify-otp', {
         method: 'POST',
@@ -194,14 +252,38 @@ const WebLogin = () => {
       });
 
       const data = await response.json();
-      console.log('Login response:', data);
+      console.log('📥 Login response:', data);
+
+      // ✅ UPDATED: Handle pending queue error ONLY for newly registered patients
+      if (response.status === 403 && data.error === 'PENDING_QUEUE') {
+        console.log('⚠️ Received PENDING_QUEUE error:', data);
+        
+        if (data.isNewlyRegistered) {
+          console.log('🚫 Blocking newly registered patient');
+          setError(
+            `You cannot log in while your registration is being processed.\n\n` +
+            `Queue Number: ${data.queueNumber}\n` +
+            `Department: ${data.departmentName}\n\n` +
+            `Please wait until your consultation is completed.`
+          );
+          setLoading(false);
+          return;
+        } else {
+          // Existing patient - should not reach here, but handle gracefully
+          console.log('⚠️ Unexpected PENDING_QUEUE for existing patient - allowing login anyway');
+          // Continue with login anyway (this shouldn't happen with updated backend)
+        }
+      }
 
       if (!response.ok) {
+        console.error('❌ Login failed:', data.error);
         setError(data.error || 'Login failed. Please check your verification code.');
         setLoading(false);
         return;
       }
 
+      console.log('✅ Login successful for:', data.patient.name);
+      
       // Store comprehensive patient data
       localStorage.setItem('patientToken', data.token);
       localStorage.setItem('patientId', data.patient.patient_id);
@@ -222,13 +304,12 @@ const WebLogin = () => {
       localStorage.setItem('deviceType', 'web');
       localStorage.setItem('loginTimestamp', new Date().toISOString());
 
-      console.log('✅ Login successful for:', data.patient.name);
+      console.log('🎉 Redirecting to /web-main');
       
-      // Use window.location.replace for better security
       window.location.replace('/web-main');
 
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('💥 Login error:', err);
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);

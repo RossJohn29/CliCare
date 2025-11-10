@@ -329,17 +329,21 @@ const WebRegistration = () => {
       return 'Invalid appointment date';
     }
     
-    if (isToday) {
+    if (isToday && timeSlots.length > 0) {
       const currentHour = new Date().getHours();
+      const currentMinute = new Date().getMinutes();
+      const currentTimeInMinutes = currentHour * 60 + currentMinute;
       
-      if (time === 'morning' && currentHour >= 12) {
-        return 'Morning time slot is no longer available today';
-      }
-      if (time === 'afternoon' && currentHour >= 17) {
-        return 'Afternoon time slot is no longer available today';
-      }
-      if (time === 'evening' && currentHour >= 20) {
-        return 'Evening time slot is no longer available today';
+      // Find the selected time slot from database
+      const selectedSlot = timeSlots.find(slot => slot.slot_name === time);
+      
+      if (selectedSlot) {
+        const [endHour, endMinute] = selectedSlot.end_time.split(':').map(Number);
+        const slotEndTimeInMinutes = endHour * 60 + endMinute;
+        
+        if (currentTimeInMinutes >= (slotEndTimeInMinutes - 120)) {
+          return `${selectedSlot.display_label.split(' ')[0]} time slot is no longer available today`;
+        }
       }
     }
     
@@ -759,38 +763,42 @@ const WebRegistration = () => {
   };
 
   const generateAvailableTimeSlots = (selectedDate) => {
-    const allSlots = [
-      { value: 'morning', label: 'Morning (8:00 AM - 12:00 PM)', endHour: 12 },
-      { value: 'afternoon', label: 'Afternoon (12:00 PM - 5:00 PM)', endHour: 17 },
-      { value: 'evening', label: 'Evening (5:00 PM - 8:00 PM)', endHour: 20 },
-      { value: 'anytime', label: 'Any available time', endHour: 24 }
-    ];
-
-    if (!selectedDate) return allSlots;
+    if (!selectedDate || timeSlots.length === 0) return timeSlots;
 
     const selectedDateObj = new Date(selectedDate);
     const today = new Date();
     const isToday = selectedDateObj.toDateString() === today.toDateString();
 
+    // If not today, return all slots
     if (!isToday) {
-      return allSlots;
+      return timeSlots;
     }
 
+    // If today, filter out past slots
     const currentHour = today.getHours();
-    const availableSlots = [];
+    const currentMinute = today.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-    allSlots.forEach(slot => {
-      if (slot.value === 'anytime') {
-        if (availableSlots.length > 0) {
-          availableSlots.push(slot);
-        }
-      } else if (currentHour < slot.endHour - 2) {
-        availableSlots.push(slot);
-      }
+    const availableSlots = timeSlots.filter(slot => {
+      // Parse end_time from database (format: "HH:MM:SS")
+      const [endHour, endMinute] = slot.end_time.split(':').map(Number);
+      const slotEndTimeInMinutes = endHour * 60 + endMinute;
+      
+      // Keep slot if current time is at least 2 hours before slot ends
+      // This gives patients reasonable time to arrive
+      return currentTimeInMinutes < (slotEndTimeInMinutes - 120); // 120 minutes = 2 hours
     });
 
+    // If no slots available, return a walk-in option
     return availableSlots.length > 0 ? availableSlots : [
-      { value: 'emergency', label: 'Walk-in (subject to availability)' }
+      { 
+        slot_id: 'emergency',
+        slot_name: 'emergency', 
+        display_label: 'Walk-in (subject to availability)',
+        start_time: '08:00:00',
+        end_time: '20:00:00',
+        is_active: true
+      }
     ];
   };
 
@@ -1723,15 +1731,12 @@ const WebRegistration = () => {
             autoComplete="off"
           >
             <option value="">Select preferred time</option>
-            {timeSlots.map(slot => (
+            {generateAvailableTimeSlots(formData.preferredDate).map(slot => (
               <option key={slot.slot_id} value={slot.slot_name}>
                 {slot.display_label}
               </option>
             ))}
           </select>
-          {formData.preferredDate && new Date(formData.preferredDate).toDateString() === new Date().toDateString() && (
-            <small className="input-reminder">Same-day appointments are subject to availability</small>
-          )}
           {showValidation && fieldErrors.appointmentTime && (
             <small className="error-text">{fieldErrors.appointmentTime}</small>
           )}
