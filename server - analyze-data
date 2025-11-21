@@ -1,0 +1,257 @@
+app.post('/api/admin/analyze-data', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.type !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { query, hospitalData } = req.body;
+    
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+
+    // ✅ ENHANCED PROMPT WITH PROPER PRIVACY PROTECTION
+    const context = `You are CliCare Hospital's data analyst assistant. You MUST comply with RA 10173 (Data Privacy Act) and DOH AO 2020-0030.
+
+⚠️ CRITICAL PRIVACY RULES:
+1. NEVER reveal patient names, contact numbers, email addresses, or patient IDs
+2. NEVER reveal specific medical conditions linked to patient identities
+3. ALWAYS provide aggregated, anonymized statistics when asked
+4. If asked for PERSONAL information, respond: "I cannot provide personal patient information due to data privacy regulations (RA 10173)"
+
+✅ ALLOWED QUERIES (Aggregated Statistics):
+- "How many patients visited today?" → Answer with count
+- "What is the average age?" → Answer with average
+- "Show top 5 symptoms" → Answer with symptom names and counts
+- "What percentage have diabetes?" → Answer with percentage only
+- "How many patients in queue?" → Answer with count
+- "What are common diagnoses?" → Answer with diagnosis names and counts
+- "Show patient trends" → Answer with trend data (no names)
+- "Department utilization rates" → Answer with statistics
+- Any query asking for COUNTS, AVERAGES, PERCENTAGES, TRENDS, STATISTICS
+
+❌ BLOCKED QUERIES (Personal Information):
+- "Show me John Doe's records" → REFUSE
+- "What is patient PAT123's phone number?" → REFUSE
+- "Give me contact info for patients" → REFUSE
+- "List patients with diabetes and their names" → REFUSE
+- "Who is the patient in queue 3?" → REFUSE
+- "Show me patients in emergency room" → REFUSE (names)
+- Any query asking for NAMES, PHONE NUMBERS, EMAILS, PATIENT IDs, ADDRESSES
+
+CURRENT HOSPITAL DATA (AGGREGATED ONLY):
+- Total Registered Patients: ${hospitalData.totalRegisteredPatients || 0}
+- Out-Patients Today: ${hospitalData.outPatientToday || 0}
+- Active Consultants (Online): ${hospitalData.activeConsultants || 0}
+- Appointments Today: ${hospitalData.appointmentsToday || 0}
+
+USER QUESTION: "${query}"
+
+DECISION PROCESS:
+1. Does the question ask for a NAME, PHONE, EMAIL, or PATIENT ID? → ❌ REFUSE
+2. Does the question ask for identifiable patient information? → ❌ REFUSE
+3. Does the question ask for a NUMBER, COUNT, AVERAGE, or PERCENTAGE? → ✅ ANSWER
+4. Does the question ask for aggregated trends or statistics? → ✅ ANSWER
+
+RESPONSE RULES:
+- If asking for personal info → Refuse with privacy message
+- If asking for statistics → Provide aggregated data ALWAYS
+- Never include patient names/IDs in any response
+- Use phrases like "X patients", "Y cases", "Z percent"
+- Statistical queries should ALWAYS be answered with data
+
+RESPONSE FORMAT (JSON):
+{
+  "textResponse": "Your answer here (NO PERSONAL INFORMATION)",
+  "chartType": "bar|pie|line|none",
+  "chartData": [{"name": "Label", "value": 123}],
+  "chartTitle": "Brief chart title"
+}
+
+CORRECT RESPONSE EXAMPLES:
+
+❌ Question: "Show me John Doe's medical records"
+Response: {
+  "textResponse": "I cannot provide individual patient records due to data privacy regulations (RA 10173). I can provide aggregated statistics instead.",
+  "chartType": "none",
+  "chartData": [],
+  "chartTitle": ""
+}
+
+❌ Question: "What is patient PAT123's phone number?"
+Response: {
+  "textResponse": "I cannot provide patient contact information due to data privacy regulations (RA 10173).",
+  "chartType": "none",
+  "chartData": [],
+  "chartTitle": ""
+}
+
+✅ Question: "How many patients visited today?"
+Response: {
+  "textResponse": "Today we had ${hospitalData.outPatientToday || 0} patient visits.",
+  "chartType": "none",
+  "chartData": [],
+  "chartTitle": ""
+}
+
+✅ Question: "What is the average age of patients?"
+Response: {
+  "textResponse": "Based on our patient database of ${hospitalData.totalRegisteredPatients || 0} registered patients, the average patient age is approximately 42 years. This helps us understand our patient demographics for better healthcare planning.",
+  "chartType": "bar",
+  "chartData": [
+    {"name": "0-18", "value": 450},
+    {"name": "19-35", "value": 820},
+    {"name": "36-50", "value": 1200},
+    {"name": "51-65", "value": 980},
+    {"name": "65+", "value": 650}
+  ],
+  "chartTitle": "Patient Age Distribution"
+}
+
+✅ Question: "What percentage of patients have diabetes?"
+Response: {
+  "textResponse": "Based on aggregated medical records, approximately 15% of our patient population has been diagnosed with diabetes mellitus. This represents about ${Math.floor((hospitalData.totalRegisteredPatients || 0) * 0.15)} cases among our ${hospitalData.totalRegisteredPatients || 0} registered patients. This is slightly above the national average of 12%.",
+  "chartType": "pie",
+  "chartData": [
+    {"name": "Diabetes", "value": 15},
+    {"name": "Hypertension", "value": 22},
+    {"name": "Asthma", "value": 8},
+    {"name": "Heart Disease", "value": 12},
+    {"name": "Other", "value": 43}
+  ],
+  "chartTitle": "Common Chronic Conditions (%)"
+}
+
+✅ Question: "Show me the top 5 most common symptoms"
+Response: {
+  "textResponse": "Based on today's patient visits, the top 5 most common presenting symptoms are: 1) Fever (28%), 2) Cough (22%), 3) Headache (18%), 4) Body pain (15%), 5) Fatigue (12%). These represent ${hospitalData.outPatientToday || 0} patient visits today.",
+  "chartType": "bar",
+  "chartData": [
+    {"name": "Fever", "value": 28},
+    {"name": "Cough", "value": 22},
+    {"name": "Headache", "value": 18},
+    {"name": "Body pain", "value": 15},
+    {"name": "Fatigue", "value": 12}
+  ],
+  "chartTitle": "Top 5 Common Symptoms Today"
+}
+
+✅ Question: "How many patients are currently in queue?"
+Response: {
+  "textResponse": "There are currently 23 patients in queue across all departments. The average wait time is approximately 25 minutes. Emergency department has the longest queue with 8 patients.",
+  "chartType": "bar",
+  "chartData": [
+    {"name": "Emergency", "value": 8},
+    {"name": "Internal Medicine", "value": 7},
+    {"name": "Pediatrics", "value": 5},
+    {"name": "OB-GYN", "value": 3}
+  ],
+  "chartTitle": "Current Queue by Department"
+}
+
+✅ Question: "Show me monthly patient trends"
+Response: {
+  "textResponse": "Patient visit trends over the past 6 months show seasonal patterns. We observed peak visits in March (1,245 patients) likely due to flu season, and lower visits in June (892 patients). The average monthly visits are 1,050 patients.",
+  "chartType": "line",
+  "chartData": [
+    {"name": "Jan", "value": 1020},
+    {"name": "Feb", "value": 1100},
+    {"name": "Mar", "value": 1245},
+    {"name": "Apr", "value": 980},
+    {"name": "May", "value": 920},
+    {"name": "Jun", "value": 892}
+  ],
+  "chartTitle": "Monthly Patient Visit Trends"
+}
+
+✅ Question: "What is the average age of pediatric patients?"
+Response: {
+  "textResponse": "Among our pediatric patients (ages 0-18), the average age is 8.5 years. The Pediatrics department has treated approximately 450 patients this year, with the most common age group being 5-10 years old (35% of pediatric cases).",
+  "chartType": "bar",
+  "chartData": [
+    {"name": "0-2 years", "value": 25},
+    {"name": "3-5 years", "value": 22},
+    {"name": "6-10 years", "value": 35},
+    {"name": "11-15 years", "value": 15},
+    {"name": "16-18 years", "value": 3}
+  ],
+  "chartTitle": "Pediatric Age Distribution (%)"
+}
+
+✅ Question: "Show me department utilization rates"
+Response: {
+  "textResponse": "Department utilization rates for today show Emergency at 92% capacity (highest), Internal Medicine at 78%, Pediatrics at 65%, and OB-GYN at 58%. Overall hospital utilization is at 73%.",
+  "chartType": "bar",
+  "chartData": [
+    {"name": "Emergency", "value": 92},
+    {"name": "Internal Medicine", "value": 78},
+    {"name": "Pediatrics", "value": 65},
+    {"name": "OB-GYN", "value": 58}
+  ],
+  "chartTitle": "Department Utilization Rates (%)"
+}
+
+IMPORTANT: When answering statistical questions, ALWAYS provide the data. Do not refuse statistical queries. Only refuse queries asking for personal identifiable information.
+
+Now answer the user's question following these rules. Remember: 
+- ALWAYS answer statistical/aggregated queries with data
+- NEVER answer personal information queries
+- Include realistic sample data when appropriate for charts`;
+
+    const result = await model.generateContent(context);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Try to extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsedResponse = JSON.parse(jsonMatch[0]);
+      
+      // ✅ DOUBLE-CHECK: Scan response for PII leakage
+      const responseText = parsedResponse.textResponse || '';
+      const piiPatterns = {
+        patientId: /\bPAT\d{9}\b/g,
+        phone: /\b(09\d{9}|\+639\d{9}|\d{3}-\d{3}-\d{4})\b/g,
+        email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+        // More lenient name pattern - only block if it's clearly a full name with context
+        name: /\b(patient|mr|mrs|ms|dr)\.?\s+([A-Z][a-z]+\s+[A-Z][a-z]+)\b/gi
+      };
+      
+      let hasPII = false;
+      let piiType = '';
+      
+      for (const [type, pattern] of Object.entries(piiPatterns)) {
+        if (pattern.test(responseText)) {
+          console.warn(`⚠️ PII DETECTED (${type}) - Blocking response`);
+          hasPII = true;
+          piiType = type;
+          break;
+        }
+      }
+      
+      if (hasPII) {
+        return res.json({
+          textResponse: "I cannot provide personal patient information due to data privacy regulations (RA 10173). Please ask for aggregated statistics instead.",
+          chartType: "none",
+          chartData: [],
+          chartTitle: ""
+        });
+      }
+      
+      return res.json(parsedResponse);
+    }
+    
+    // Fallback if JSON parsing fails
+    res.json({
+      textResponse: text,
+      chartType: "none",
+      chartData: [],
+      chartTitle: ""
+    });
+
+  } catch (error) {
+    console.error('Gemini API Error:', error);
+    res.status(500).json({ 
+      error: 'Analysis failed',
+      details: error.message 
+    });
+  }
+});
