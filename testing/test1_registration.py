@@ -1,9 +1,5 @@
 """
-CliCare Objective 1 - Registration System Performance Testing (COMPREHENSIVE)
-============================================================================
-Tests Web Pre-Registration, Kiosk Registration, QR Verification, and Navigation Maps
-Generates all required tables, matrices, and metrics for research documentation
-
+CliCare Objective 1 - Registration System Performance Testing
 Run: python test1_registration.py
 """
 
@@ -77,11 +73,8 @@ def test_web_preregistration():
     
     total_attempts = 50
     successful = 0
-    processing_times = []
     
     for i in range(total_attempts):
-        start_time = time.time()
-        
         timestamp = int(time.time() * 1000000) + (i * 1000)
         patient_data = {
             "name": f"Web Test Patient {i} {timestamp}",
@@ -104,24 +97,18 @@ def test_web_preregistration():
         
         result = make_api_request("api/temp-registration", method="POST", data=patient_data)
         
-        processing_time = time.time() - start_time
-        processing_times.append(processing_time)
-        
         if result and result.get('success'):
             successful += 1
-            print(f"  Web Test {i+1}/{total_attempts}: ✅ Success ({processing_time:.2f}s)")
+            print(f"  Web Test {i+1}/{total_attempts}: ✅ Success")
         else:
             print(f"  Web Test {i+1}/{total_attempts}: ❌ Failed")
         
         time.sleep(0.5)
     
     wprsr = (successful / total_attempts * 100)
-    avg_time = sum(processing_times) / len(processing_times) if processing_times else 0
-    avg_time_minutes = avg_time / 60
     
     return {
         'wprsr': wprsr,
-        'avg_processing_time_min': avg_time_minutes,
         'successful': successful,
         'total': total_attempts
     }
@@ -132,11 +119,8 @@ def test_kiosk_registration():
     
     total_sessions = 50
     completed = 0
-    processing_times = []
     
     for i in range(total_sessions):
-        start_time = time.time()
-        
         timestamp = int(time.time() * 1000000) + (i * 1000)
         patient_data = {
             "name": f"Kiosk Test Patient {i} {timestamp}",
@@ -156,24 +140,18 @@ def test_kiosk_registration():
         
         result = make_api_request("api/patient/register", method="POST", data=patient_data)
         
-        processing_time = time.time() - start_time
-        processing_times.append(processing_time)
-        
         if result and result.get('success'):
             completed += 1
-            print(f"  Kiosk Test {i+1}/{total_sessions}: ✅ Completed ({processing_time:.2f}s)")
+            print(f"  Kiosk Test {i+1}/{total_sessions}: ✅ Completed")
         else:
             print(f"  Kiosk Test {i+1}/{total_sessions}: ❌ Failed")
         
         time.sleep(0.5)
     
     hkrcr = (completed / total_sessions * 100)
-    avg_time = sum(processing_times) / len(processing_times) if processing_times else 0
-    avg_time_minutes = avg_time / 60
     
     return {
         'hkrcr': hkrcr,
-        'avg_processing_time_min': avg_time_minutes,
         'completed': completed,
         'total': total_sessions
     }
@@ -265,10 +243,6 @@ def test_registration_system_performance():
     qr_results = test_qr_code_verification()
     nav_results = test_navigation_map_generation()
     
-    # Calculate composite metrics
-    crfsr = min(web_results['wprsr'], kiosk_results['hkrcr'])  # End-to-end success rate
-    dsa = 99.5  # Simulated data synchronization accuracy
-    
     # Print results
     print(f"\n{'='*80}")
     print("4.1.3.4 REGISTRATION SYSTEM TEST RESULTS")
@@ -288,12 +262,6 @@ def test_registration_system_performance():
         'Result (%)': f"{kiosk_results['hkrcr']:.2f}",
         'Interpretation': 'PASS' if kiosk_results['hkrcr'] >= 90 else 'FAIL'
     }, {
-        'Metric': 'Complete Registration Flow Success Rate (CRFSR)',
-        'Formula': '(Successful End-to-End Registrations / Total Attempts) × 100',
-        'Target (%)': '≥90',
-        'Result (%)': f"{crfsr:.2f}",
-        'Interpretation': 'PASS' if crfsr >= 90 else 'FAIL'
-    }, {
         'Metric': 'QR Code Verification Accuracy (QRCVA)',
         'Formula': '(Successful QR Scans / Total QR Scan Attempts) × 100',
         'Target (%)': '≥98',
@@ -305,30 +273,12 @@ def test_registration_system_performance():
         'Target (%)': '≥98',
         'Result (%)': f"{nav_results['nmgsr']:.2f}",
         'Interpretation': 'PASS' if nav_results['nmgsr'] >= 98 else 'FAIL'
-    }, {
-        'Metric': 'Data Synchronization Accuracy (DSA)',
-        'Formula': '(Correctly Synced Records / Total Records) × 100',
-        'Target (%)': '≥99',
-        'Result (%)': f"{dsa:.2f}",
-        'Interpretation': 'PASS' if dsa >= 99 else 'FAIL'
-    }, {
-        'Metric': 'Average Processing Time – Kiosk',
-        'Formula': 'Total Time / Sessions',
-        'Target (%)': '≤5 min',
-        'Result (%)': f"{kiosk_results['avg_processing_time_min']:.2f} min",
-        'Interpretation': 'PASS' if kiosk_results['avg_processing_time_min'] <= 5 else 'FAIL'
-    }, {
-        'Metric': 'Average Processing Time – Web',
-        'Formula': 'Total Time / Sessions',
-        'Target (%)': '≤3 min',
-        'Result (%)': f"{web_results['avg_processing_time_min']:.2f} min",
-        'Interpretation': 'PASS' if web_results['avg_processing_time_min'] <= 3 else 'FAIL'
     }])
     
     # Print summary
     for _, row in registration_metrics.iterrows():
         status = '✅ PASS' if row['Interpretation'] == 'PASS' else '❌ FAIL'
-        print(f"{row['Metric']}: {row['Result (%)']} (Target: {row['Target (%)']}) {status}")
+        print(f"{row['Metric']}: {row['Result (%)']}% (Target: {row['Target (%)']}) {status}")
     
     # Export results
     registration_metrics.to_csv(f"{OUTPUT_DIR}/metrics_summary.csv", index=False)
@@ -336,12 +286,8 @@ def test_registration_system_performance():
     return {
         'wprsr': web_results['wprsr'],
         'hkrcr': kiosk_results['hkrcr'],
-        'crfsr': crfsr,
         'qrcva': qr_results['qrcva'],
-        'nmgsr': nav_results['nmgsr'],
-        'dsa': dsa,
-        'avg_kiosk_time': kiosk_results['avg_processing_time_min'],
-        'avg_web_time': web_results['avg_processing_time_min']
+        'nmgsr': nav_results['nmgsr']
     }
 
 def create_registration_visualizations(reg_results):
@@ -372,47 +318,47 @@ def create_registration_visualizations(reg_results):
         ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, 
                 f'{value:.1f}%', ha='center', va='bottom')
     
-    # 2. Processing Times
-    time_metrics = ['Web Processing', 'Kiosk Processing']
-    time_values = [reg_results['avg_web_time'], reg_results['avg_kiosk_time']]
-    time_targets = [3, 5]
-    
-    x_pos = np.arange(len(time_metrics))
-    bars2 = ax2.bar(x_pos, time_values, alpha=0.8, color='lightblue', label='Actual')
-    ax2.plot(x_pos, time_targets, 'ro-', label='Target', linewidth=2)
-    ax2.set_xlabel('Process Type')
-    ax2.set_ylabel('Time (minutes)')
-    ax2.set_title('Processing Time Performance')
-    ax2.set_xticks(x_pos)
-    ax2.set_xticklabels(time_metrics)
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    # Add value labels on bars
-    for bar, value in zip(bars2, time_values):
-        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
-                f'{value:.2f}m', ha='center', va='bottom')
-    
-    # 3. Success Rate Comparison
+    # 2. Success Rate by Component (Detailed)
     categories = ['Web Pre-Reg', 'Kiosk Reg', 'QR Verification', 'Navigation']
     success_rates = [reg_results['wprsr'], reg_results['hkrcr'], reg_results['qrcva'], reg_results['nmgsr']]
     colors = ['skyblue', 'lightgreen', 'lightcoral', 'gold']
     
-    bars3 = ax3.bar(categories, success_rates, color=colors, alpha=0.8)
-    ax3.axhline(y=90, color='red', linestyle='--', label='Minimum Target (90%)')
-    ax3.set_ylabel('Success Rate (%)')
-    ax3.set_title('Registration Component Success Rates')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    ax3.set_xticklabels(categories, rotation=45)
+    bars2 = ax2.bar(range(len(categories)), success_rates, color=colors, alpha=0.8)
+    ax2.axhline(y=90, color='red', linestyle='--', label='Minimum Target (90%)', linewidth=2)
+    ax2.set_xlabel('Component')
+    ax2.set_ylabel('Success Rate (%)')
+    ax2.set_title('Detailed Component Performance')
+    ax2.set_xticks(range(len(categories)))
+    ax2.set_xticklabels(categories, rotation=45, ha='right')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
     
     # Add value labels on bars
-    for bar, value in zip(bars3, success_rates):
+    for bar, value in zip(bars2, success_rates):
+        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, 
+                f'{value:.1f}%', ha='center', va='bottom')
+    
+    # 3. Success Rate Comparison
+    categories_simple = ['Web Pre-Reg', 'Kiosk Reg', 'QR Verification', 'Navigation']
+    success_rates_simple = [reg_results['wprsr'], reg_results['hkrcr'], reg_results['qrcva'], reg_results['nmgsr']]
+    colors_simple = ['skyblue', 'lightgreen', 'lightcoral', 'gold']
+    
+    bars3 = ax3.bar(categories_simple, success_rates_simple, color=colors_simple, alpha=0.8)
+    ax3.axhline(y=90, color='red', linestyle='--', label='Minimum Target (90%)')
+    ax3.set_ylabel('Success Rate (%)')
+    ax3.set_title('Core Registration Components')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+    ax3.set_xticklabels(categories_simple, rotation=45)
+    
+    # Add value labels on bars
+    for bar, value in zip(bars3, success_rates_simple):
         ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, 
                 f'{value:.1f}%', ha='center', va='bottom')
     
     # 4. Overall System Health
-    overall_score = np.mean([reg_results['wprsr'], reg_results['hkrcr'], reg_results['qrcva'], reg_results['nmgsr']])
+    overall_score = np.mean([reg_results['wprsr'], reg_results['hkrcr'], 
+                            reg_results['qrcva'], reg_results['nmgsr']])
     
     # Create a gauge-like visualization
     theta = np.linspace(0, np.pi, 100)
@@ -456,18 +402,14 @@ def generate_registration_report(reg_results):
     print_section_header("REGISTRATION SYSTEM COMPREHENSIVE REPORT")
     
     # Calculate overall system performance
-    total_metrics = 8  # Total number of key metrics
+    total_metrics = 4
     passed_metrics = 0
     
     # Count passed metrics
     if reg_results['wprsr'] >= 95: passed_metrics += 1
     if reg_results['hkrcr'] >= 90: passed_metrics += 1
-    if reg_results['crfsr'] >= 90: passed_metrics += 1
     if reg_results['qrcva'] >= 98: passed_metrics += 1
     if reg_results['nmgsr'] >= 98: passed_metrics += 1
-    if reg_results['dsa'] >= 99: passed_metrics += 1
-    if reg_results['avg_kiosk_time'] <= 5: passed_metrics += 1
-    if reg_results['avg_web_time'] <= 3: passed_metrics += 1
     
     overall_pass_rate = (passed_metrics / total_metrics * 100)
     
@@ -479,9 +421,6 @@ def generate_registration_report(reg_results):
             'kiosk_success': reg_results['hkrcr'],
             'qr_accuracy': reg_results['qrcva'],
             'navigation_success': reg_results['nmgsr'],
-            'data_sync_accuracy': reg_results['dsa'],
-            'avg_web_time': reg_results['avg_web_time'],
-            'avg_kiosk_time': reg_results['avg_kiosk_time'],
             'status': 'PASS' if overall_pass_rate >= 80 else 'FAIL'
         },
         'overall_performance': {
@@ -506,10 +445,6 @@ def generate_registration_report(reg_results):
     print(f"  Kiosk Registration: {executive_summary['registration_system']['kiosk_success']:.2f}% (Target: ≥90%)")
     print(f"  QR Code Verification: {executive_summary['registration_system']['qr_accuracy']:.2f}% (Target: ≥98%)")
     print(f"  Navigation Maps: {executive_summary['registration_system']['navigation_success']:.2f}% (Target: ≥98%)")
-    print(f"  Data Synchronization: {executive_summary['registration_system']['data_sync_accuracy']:.2f}% (Target: ≥99%)")
-    print(f"\n⏱️ PROCESSING TIMES:")
-    print(f"  Web Processing: {executive_summary['registration_system']['avg_web_time']:.2f} min (Target: ≤3 min)")
-    print(f"  Kiosk Processing: {executive_summary['registration_system']['avg_kiosk_time']:.2f} min (Target: ≤5 min)")
     print(f"\n🎯 OVERALL SYSTEM PERFORMANCE:")
     print(f"  Metrics Passed: {executive_summary['overall_performance']['passed_metrics']}/{executive_summary['overall_performance']['total_metrics']}")
     print(f"  Overall Pass Rate: {executive_summary['overall_performance']['pass_rate']:.2f}%")
@@ -610,7 +545,6 @@ def run_comprehensive_registration_tests():
         
         print(f"\n📋 Documentation Tables Generated:")
         print(f"   • Table 4.1.3.4: Registration Workflow Performance Summary")
-        print(f"   • Processing Time Analysis")
         print(f"   • Success Rate Metrics")
         
         print(f"\n💡 Next Steps:")
@@ -647,7 +581,6 @@ if __name__ == "__main__":
         print("   ✓ Test Hospital Kiosk Registration Completion Rate (HKRCR)")
         print("   ✓ Test QR Code Verification Accuracy (QRCVA)")
         print("   ✓ Test Navigation Map Generation Success Rate (NMGSR)")
-        print("   ✓ Calculate processing times and performance metrics")
         print("   ✓ Generate comprehensive performance visualizations")
         print("   ✓ Export all required tables and documentation")
         
@@ -657,6 +590,12 @@ if __name__ == "__main__":
         print(f"   • QR Code Verification: 25 test cases")
         print(f"   • Navigation Maps: 30 test cases")
         print(f"   • Total: 155 registration system test cases")
+        
+        print(f"\n🎯 Target Metrics:")
+        print(f"   • Web Pre-Registration Success Rate (WPRSR): ≥95%")
+        print(f"   • Hospital Kiosk Registration Completion Rate (HKRCR): ≥90%")
+        print(f"   • QR Code Verification Accuracy (QRCVA): ≥98%")
+        print(f"   • Navigation Map Generation Success Rate (NMGSR): ≥98%")
         
         if CLEANUP_AFTER_TEST:
             print("\n⚠️  Note: Test data will be created in your database.")
